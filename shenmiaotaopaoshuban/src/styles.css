@@ -1,0 +1,108 @@
+:root {
+  color-scheme: dark;
+  font-family: "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+  background: #dff7ff;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+}
+
+* {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html,
+body,
+#app,
+.app-shell {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+}
+
+body {
+  overscroll-behavior: none;
+  background:
+    radial-gradient(circle at 50% 18%, rgba(255, 226, 111, 0.42), transparent 34%),
+    #dff7ff;
+}
+
+.app-shell {
+  position: relative;
+  display: grid;
+  place-items: center;
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
+
+.game-host {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  opacity: 0;
+  transition: opacity 280ms ease;
+}
+
+.ready .game-host {
+  opacity: 1;
+}
+
+.game-host canvas {
+  display: block;
+  width: min(100%, 46.21svh) !important;
+  height: min(100%, 216.42svw) !important;
+  max-width: 100%;
+  max-height: 100%;
+  touch-action: none;
+  outline: none;
+}
+
+.loading-mark {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  gap: 14px;
+  color: #17627a;
+  font-size: 28px;
+  font-weight: 800;
+  letter-spacing: 8px;
+  background: linear-gradient(180deg, #c6f2ff, #effcff);
+  pointer-events: none;
+  transition: opacity 240ms ease;
+}
+
+.loading-mark i {
+  width: 42px;
+  height: 2px;
+  margin: auto;
+  background: #ffb84d;
+  animation: breathe 900ms ease-in-out infinite alternate;
+}
+
+.ready .loading-mark {
+  opacity: 0;
+}
+
+.rotate-tip {
+  display: none;
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  place-items: center;
+  color: #17627a;
+  font-size: 18px;
+  letter-spacing: 2px;
+  background: rgba(224, 248, 255, 0.97);
+}
+
+@media (orientation: landscape) and (max-height: 540px) {
+  .rotate-tip {
+    display: grid;
+  }
+}
+
+@keyframes breathe {
+  to { transform: scaleX(2.4); opacity: 0.45; }
+}

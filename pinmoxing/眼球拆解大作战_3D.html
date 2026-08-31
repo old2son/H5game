@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>眼球拆解大作战 · 3D Demo</title>
+<style>
+  :root{
+    --bg:#eef5fb; --card:#fff; --ink:#1f3a4d; --sub:#5b7488;
+    --teal:#1aa3a3; --blue:#2f8fd6; --line:#d4e3ee; --ok:#36c275; --err:#ff6b6b;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;height:100%;}
+  body{font-family:"PingFang SC","Microsoft YaHei",system-ui,sans-serif;
+    background:radial-gradient(1200px 600px at 50% -10%,#fff,var(--bg));color:var(--ink);}
+  .wrap{max-width:980px;margin:0 auto;padding:14px 16px 30px;}
+
+  header.hud{display:flex;align-items:center;gap:14px;flex-wrap:wrap;
+    background:var(--card);border:1px solid var(--line);border-radius:16px;
+    padding:12px 18px;box-shadow:0 6px 20px rgba(31,58,77,.06);}
+  .logo{font-size:26px;}
+  .title h1{font-size:20px;margin:0;letter-spacing:1px;}
+  .title p{margin:2px 0 0;font-size:12px;color:var(--sub);}
+  .stats{margin-left:auto;display:flex;gap:10px;flex-wrap:wrap;}
+  .pill{background:#f3f9fd;border:1px solid var(--line);border-radius:999px;
+    padding:6px 14px;font-size:13px;color:var(--sub);white-space:nowrap;}
+  .pill b{color:var(--ink);font-size:15px;}
+
+  .stage{margin-top:14px;display:grid;grid-template-columns:1.5fr .9fr;gap:14px;}
+  @media(max-width:760px){.stage{grid-template-columns:1fr;}}
+  .panel{background:var(--card);border:1px solid var(--line);border-radius:16px;
+    padding:14px;box-shadow:0 6px 20px rgba(31,58,77,.06);}
+  .panel h2{font-size:14px;margin:0 0 10px;color:var(--sub);font-weight:600;}
+
+  #scene{position:relative;width:100%;aspect-ratio:4/3;border-radius:14px;overflow:hidden;
+    background:linear-gradient(180deg,#fbfdff,#e7f2fb);cursor:grab;}
+  #scene.grabbing{cursor:grabbing;}
+  #scene canvas{display:block;width:100%;height:100%;}
+  .hint3d{position:absolute;left:10px;bottom:10px;font-size:12px;color:var(--sub);
+    background:rgba(255,255,255,.8);border:1px solid var(--line);border-radius:8px;padding:5px 9px;}
+
+  .chips{display:flex;flex-wrap:wrap;gap:8px;}
+  .chip{display:flex;align-items:center;gap:6px;background:#f3f9fd;border:1px solid var(--line);
+    border-radius:10px;padding:7px 10px;font-size:13px;color:var(--ink);}
+  .chip .emoji{font-size:18px;}
+  .chip.done{opacity:.4;text-decoration:line-through;}
+  .chip.active{outline:2px solid var(--blue);}
+
+  .bar{margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
+  .btn{appearance:none;border:none;cursor:pointer;font-family:inherit;background:var(--blue);
+    color:#fff;font-size:13px;font-weight:600;padding:9px 14px;border-radius:11px;
+    box-shadow:0 6px 16px rgba(47,143,214,.3);transition:filter .15s,transform .08s;}
+  .btn:hover{filter:brightness(1.05);} .btn:active{transform:translateY(1px);}
+  .btn.ghost{background:#eef4f9;color:var(--sub);box-shadow:none;border:1px solid var(--line);}
+  .btn:disabled{opacity:.5;cursor:not-allowed;filter:none;}
+  .hint{font-size:13px;color:var(--sub);}
+  .hint b{color:var(--teal);}
+
+  /* 科普卡 / 问答 / 结算 / toast 同 2D 版 */
+  .mask{position:fixed;inset:0;background:rgba(15,34,48,.45);display:none;
+    align-items:center;justify-content:center;padding:18px;z-index:2000;}
+  .mask.show{display:flex;}
+  .card{background:#fff;border-radius:18px;max-width:360px;width:100%;padding:22px;
+    box-shadow:0 20px 50px rgba(0,0,0,.25);animation:pop .25s ease;}
+  @keyframes pop{from{transform:scale(.9);opacity:0;}to{transform:scale(1);opacity:1;}}
+  .card .big{font-size:40px;} .card h3{margin:8px 0 2px;font-size:18px;}
+  .card .tag{display:inline-block;font-size:12px;color:var(--teal);background:#e6f6f6;
+    border-radius:999px;padding:3px 10px;margin-bottom:8px;}
+  .card p{font-size:14px;line-height:1.7;color:#33536b;margin:10px 0 18px;}
+  .card .row{display:flex;justify-content:flex-end;}
+
+  .quiz-wrap{display:none;} .quiz-wrap.show{display:block;margin-top:14px;}
+  .q-card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:18px;
+    box-shadow:0 6px 20px rgba(31,58,77,.06);}
+  .q-card .progress{font-size:12px;color:var(--sub);margin-bottom:6px;}
+  .q-card .question{font-size:16px;font-weight:600;margin:0 0 14px;line-height:1.5;}
+  .opts{display:grid;gap:10px;}
+  .opt{text-align:left;background:#f6fafd;border:1px solid var(--line);border-radius:12px;
+    padding:12px 14px;font-size:14px;color:var(--ink);cursor:pointer;transition:background .12s,border-color .12s;}
+  .opt:hover{background:#eaf3fa;}
+  .opt.correct{background:#e9faf0;border-color:var(--ok);color:#1c7a48;}
+  .opt.wrong{background:#fdeaea;border-color:var(--err);color:#b53636;}
+  .opt:disabled{cursor:default;}
+  .q-feedback{margin-top:12px;font-size:13px;min-height:18px;}
+  .q-feedback.ok{color:var(--ok);} .q-feedback.no{color:var(--err);}
+  .result{text-align:center;padding:10px 0;}
+  .result .score{font-size:46px;font-weight:800;color:var(--blue);}
+  .result .stars{font-size:28px;letter-spacing:4px;margin:6px 0;}
+  .result .line{font-size:14px;color:var(--sub);margin:4px 0;}
+  .toast{position:fixed;left:50%;top:18px;transform:translateX(-50%);background:var(--err);
+    color:#fff;padding:10px 18px;border-radius:999px;font-size:14px;
+    box-shadow:0 8px 20px rgba(255,107,107,.35);opacity:0;pointer-events:none;
+    transition:opacity .2s,top .2s;z-index:3000;}
+  .toast.show{opacity:1;top:26px;}
+  footer{margin-top:18px;text-align:center;font-size:12px;color:#9bb0c1;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="hud">
+    <div class="logo">👁️</div>
+    <div class="title">
+      <h1>眼球拆解大作战 · 3D</h1>
+      <p>真 3D 模型 · 拖拽拼装 · Demo 原型</p>
+    </div>
+    <div class="stats">
+      <div class="pill">得分 <b id="scoreVal">0</b></div>
+      <div class="pill">已拼装 <b id="progVal">0/0</b></div>
+      <div class="pill">用时 <b id="timeVal">0:00</b></div>
+    </div>
+  </header>
+
+  <div class="stage">
+    <section class="panel">
+      <h2>① 旋转视角，把散落的 3D 零件拖回眼球</h2>
+      <div id="scene">
+        <div class="hint3d">🖱️ 拖空白旋转 · 滚轮缩放 · 拖动零件到发光目标点</div>
+      </div>
+    </section>
+
+    <aside class="panel">
+      <h2>② 零件清单</h2>
+      <div class="chips" id="chips"></div>
+      <div class="bar">
+        <button class="btn ghost" id="scatterBtn">散开零件</button>
+        <button class="btn ghost" id="autoBtn">一键拼装</button>
+      </div>
+      <div class="bar">
+        <span class="hint" id="quizHint">先拼装完 <b>6</b> 个零件，再开启问答 →</span>
+        <button class="btn" id="quizBtn" disabled>进入眼球功能问答</button>
+      </div>
+    </aside>
+  </div>
+
+  <div class="quiz-wrap" id="quizWrap">
+    <div class="q-card" id="qCard"></div>
+  </div>
+
+  <footer>原型说明：本 3D Demo 用 Three.js 以基础几何体近似建模眼球各结构（角膜/虹膜/晶状体/玻璃体/视网膜/视神经），
+    仅作 3D 交互与流程验证；正式版可替换为医学级 3D 模型并加上更精细的拖拽吸附与动画。</footer>
+</div>
+
+<!-- 科普卡 -->
+<div class="mask" id="mask">
+  <div class="card">
+    <div class="big" id="cardEmoji">🔍</div>
+    <span class="tag">已解锁科普卡</span>
+    <h3 id="cardName">角膜</h3>
+    <p id="cardDesc"></p>
+    <div class="row"><button class="btn" id="cardOk">知道了，继续拼装</button></div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<!-- Three.js（ES Module + importmap，需联网加载 CDN） -->
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+/* ============ 数据 ============ */
+const PARTS = [
+  {id:'cornea', name:'角膜', emoji:'🔍', r:0.9, color:0x9fd8f5,
+   home:new THREE.Vector3(2.0,0,0),
+   desc:'眼睛最前方的透明“窗户”，呈弧形。光线首先穿过它进入眼球，并由它完成第一次折射聚焦。'},
+  {id:'iris', name:'虹膜', emoji:'🌈', r:0.78, color:0x6fb6e0,
+   home:new THREE.Vector3(1.55,0,0),
+   desc:'眼睛的“调色盘”，色素决定眼睛颜色。中央的孔是瞳孔，虹膜通过收缩调节进光量。'},
+  {id:'lens', name:'晶状体', emoji:'🔆', r:0.62, color:0x7fe0e0,
+   home:new THREE.Vector3(1.15,0,0),
+   desc:'富有弹性的双凸透镜，像相机镜头。通过变厚变薄改变焦距，把光线精准聚焦到视网膜上。'},
+  {id:'vitreous', name:'玻璃体', emoji:'💧', r:1.5, color:0xbfe6f7,
+   home:new THREE.Vector3(0,0,0),
+   desc:'填充眼球内部的透明胶状物，维持眼球圆润形状，并让光线顺利抵达后方的视网膜。'},
+  {id:'retina', name:'视网膜', emoji:'🖼️', r:1.05, color:0xef9fb0,
+   home:new THREE.Vector3(-1.85,0,0),
+   desc:'眼球后壁的“成像幕布”，布满感光细胞（视杆/视锥），把光信号转化为神经电信号。'},
+  {id:'optic', name:'视神经', emoji:'🧠', r:0.5, color:0xf6c08a,
+   home:new THREE.Vector3(-2.05,-0.5,0),
+   desc:'连接眼睛与大脑的“光缆”，把视网膜生成的视觉信号传送到大脑，最终形成我们看到的图像。'},
+];
+
+const QUIZ = [
+  {q:'位于眼球最前方、负责让光线进入并初步折射的结构是？', opts:['视网膜','角膜','视神经','玻璃体'], a:1},
+  {q:'像相机镜头一样，通过变厚变薄来调节焦距、聚焦成像的是？', opts:['晶状体','虹膜','巩膜','瞳孔'], a:0},
+  {q:'布满感光细胞、相当于“成像幕布”的结构是？', opts:['玻璃体','虹膜','视网膜','角膜'], a:2},
+  {q:'把眼睛看到的信号传给大脑，让我们“看见”东西的是？', opts:['晶状体','视神经','角膜','瞳孔'], a:1},
+];
+
+/* ============ 状态 ============ */
+let score=0, placed=0, quizScore=0, quizIdx=0, seconds=0, timer=null;
+const placedMap={};
+
+/* ============ DOM ============ */
+const sceneEl=document.getElementById('scene');
+const chipsEl=document.getElementById('chips');
+const scoreVal=document.getElementById('scoreVal');
+const progVal=document.getElementById('progVal');
+const timeVal=document.getElementById('timeVal');
+const quizHint=document.getElementById('quizHint');
+const quizBtn=document.getElementById('quizBtn');
+const quizWrap=document.getElementById('quizWrap');
+const qCard=document.getElementById('qCard');
+const mask=document.getElementById('mask');
+const toast=document.getElementById('toast');
+
+/* ============ Three.js 场景 ============ */
+const renderer=new THREE.WebGLRenderer({antialias:true,alpha:true});
+renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
+sceneEl.appendChild(renderer.domElement);
+
+const scene=new THREE.Scene();
+const camera=new THREE.PerspectiveCamera(45,4/3,0.1,100);
+camera.position.set(4.5,3,7);
+
+const controls=new OrbitControls(camera,renderer.domElement);
+controls.enableDamping=true; controls.dampingFactor=0.08;
+controls.enablePan=false; controls.minDistance=4.5; controls.maxDistance=14;
+
+scene.add(new THREE.AmbientLight(0xffffff,0.75));
+const dir=new THREE.DirectionalLight(0xffffff,0.9); dir.position.set(5,8,6); scene.add(dir);
+const dir2=new THREE.DirectionalLight(0xbfe0ff,0.4); dir2.position.set(-6,-2,-4); scene.add(dir2);
+
+/* 眼球外壁（静态参照，半透明） */
+const sclera=new THREE.Mesh(
+  new THREE.SphereGeometry(2.25,40,32),
+  new THREE.MeshPhongMaterial({color:0xffffff,transparent:true,opacity:0.10,side:THREE.DoubleSide})
+);
+scene.add(sclera);
+const scleraWire=new THREE.Mesh(
+  new THREE.SphereGeometry(2.25,24,18),
+  new THREE.MeshBasicMaterial({color:0x9bc3dd,wireframe:true,transparent:true,opacity:0.18})
+);
+scene.add(scleraWire);
+
+/* 文字标签（Sprite） */
+function makeLabel(text,bg='rgba(255,255,255,0.92)',fg='#1f3a4d'){
+  const c=document.createElement('canvas'); c.width=256; c.height=64;
+  const ctx=c.getContext('2d');
+  ctx.fillStyle=bg; roundRect(ctx,4,12,248,40,20); ctx.fill();
+  ctx.fillStyle=fg; ctx.font='bold 30px "PingFang SC",sans-serif';
+  ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText(text,128,33);
+  const tex=new THREE.CanvasTexture(c); tex.anisotropy=4;
+  const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:tex,depthTest:false,transparent:true}));
+  sp.scale.set(1.7,0.42,1);
+  return sp;
+}
+function roundRect(ctx,x,y,w,h,r){ctx.beginPath();ctx.moveTo(x+r,y);
+  ctx.arcTo(x+w,y,x+w,y+h,r);ctx.arcTo(x+w,y+h,x,y+h,r);
+  ctx.arcTo(x,y+h,x,y,r);ctx.arcTo(x,y,x+w,y,r);ctx.closePath();}
+
+/* 几何体构建 */
+function sphere(r,color,op){return new THREE.Mesh(
+  new THREE.SphereGeometry(r,32,24),
+  new THREE.MeshPhongMaterial({color,transparent:true,opacity:op,shininess:60}));}
+function torus(r,t,color){return new THREE.Mesh(
+  new THREE.TorusGeometry(r,t,16,40),
+  new THREE.MeshPhongMaterial({color,shininess:40}));}
+function backCap(color){const g=new THREE.SphereGeometry(1.9,32,24,0,Math.PI*2,0,Math.PI*0.55);
+  g.rotateZ(Math.PI/2); // 圆顶朝 -X
+  return new THREE.Mesh(g,new THREE.MeshPhongMaterial({color,side:THREE.DoubleSide,shininess:30}));}
+function nerve(color){const g=new THREE.CylinderGeometry(0.25,0.32,1.4,20);
+  g.rotateZ(Math.PI/2); // 轴向沿 X
+  return new THREE.Mesh(g,new THREE.MeshPhongMaterial({color,shininess:30}));}
+
+function buildMesh(p){
+  if(p.id==='cornea') return sphere(0.85,p.color,0.5);
+  if(p.id==='iris')   return torus(0.6,0.2,p.color);
+  if(p.id==='lens'){const m=sphere(0.5,p.color,0.6); m.scale.set(1,1.4,1); return m;}
+  if(p.id==='vitreous') return sphere(1.45,p.color,0.16);
+  if(p.id==='retina') return backCap(p.color);
+  if(p.id==='optic')  return nerve(p.color);
+}
+
+/* 创建零件 Group（mesh + 标签） */
+const partGroups=[];     // 全部零件 group
+const ghostMap={};        // id -> 目标点提示 group
+PARTS.forEach(p=>{
+  const g=new THREE.Group();
+  const m=buildMesh(p); g.add(m);
+  const label=makeLabel(p.name); label.position.set(0, p.r+0.55, 0); g.add(label);
+  g.userData={isPart:true,id:p.id,home:p.home.clone(),name:p.name,emoji:p.emoji,desc:p.desc,r:p.r};
+  scene.add(g); partGroups.push(g);
+
+  // 目标点提示（线框球 + 标签）
+  const ghost=new THREE.Group();
+  const gh=new THREE.Mesh(new THREE.SphereGeometry(p.r,20,16),
+    new THREE.MeshBasicMaterial({color:p.color,wireframe:true,transparent:true,opacity:0.35}));
+  ghost.add(gh);
+  const gl=makeLabel(p.name+' ?','rgba(255,255,255,0.85)','#2f8fd6');
+  gl.position.set(0,p.r+0.55,0); ghost.add(gl);
+  ghost.position.copy(p.home);
+  scene.add(ghost); ghostMap[p.id]=ghost;
+
+  // 清单
+  const chip=document.createElement('div');
+  chip.className='chip'; chip.dataset.part=p.id;
+  chip.innerHTML='<span class="emoji">'+p.emoji+'</span>'+p.name;
+  chipsEl.appendChild(chip);
+});
+
+/* 散开 / 复位 */
+function scatter(){
+  partGroups.forEach(g=>{
+    const p=g.userData;
+    p.placed=false; placedMap[p.id]=false;
+    // 随机方向向外散开
+    const dirv=new THREE.Vector3(Math.random()*2-1,Math.random()*2-1,Math.random()*2-1).normalize();
+    g.position.copy(p.home).add(dirv.multiplyScalar(3.0+Math.random()*1.2));
+    g.visible=true;
+    ghostMap[p.id].visible=true;
+    chipsEl.querySelector(`[data-part="${p.id}"]`).classList.remove('done','active');
+  });
+  placed=0; updateHUD();
+  quizBtn.disabled=true; quizHint.innerHTML='先拼装完 <b>'+PARTS.length+'</b> 个零件，再开启问答 →';
+}
+scatter();
+
+/* ============ 拖拽交互（射线 + 平面） ============ */
+const raycaster=new THREE.Raycaster();
+const pointer=new THREE.Vector2();
+const dragPlane=new THREE.Plane();
+const offset=new THREE.Vector3();
+let selected=null;
+
+function setPointer(e){
+  const rect=renderer.domElement.getBoundingClientRect();
+  pointer.x=((e.clientX-rect.left)/rect.width)*2-1;
+  pointer.y=-((e.clientY-rect.top)/rect.height)*2+1;
+}
+function findPart(){
+  raycaster.setFromCamera(pointer,camera);
+  const hits=raycaster.intersectObjects(partGroups,true);
+  for(const h of hits){
+    let o=h.object; while(o && !o.userData.isPart) o=o.parent;
+    if(o && !o.userData.placed) return o;
+  }
+  return null;
+}
+// 在容器捕获阶段拦截，先于 OrbitControls
+sceneEl.addEventListener('pointerdown',(e)=>{
+  if(timer===null) startTimer();
+  setPointer(e);
+  const part=findPart();
+  if(part){
+    selected=part; controls.enabled=false; sceneEl.classList.add('grabbing');
+    const n=new THREE.Vector3(); camera.getWorldDirection(n);
+    dragPlane.setFromNormalAndCoplanarPoint(n,part.position);
+    const hit=new THREE.Vector3();
+    raycaster.ray.intersectPlane(dragPlane,hit);
+    offset.copy(part.position).sub(hit);
+    chipsEl.querySelector(`[data-part="${part.userData.id}"]`).classList.add('active');
+  }
+},true);
+window.addEventListener('pointermove',(e)=>{
+  if(!selected) return;
+  setPointer(e);
+  raycaster.setFromCamera(pointer,camera);
+  const hit=new THREE.Vector3();
+  if(raycaster.ray.intersectPlane(dragPlane,hit)){
+    selected.position.copy(hit).add(offset);
+  }
+});
+window.addEventListener('pointerup',()=>{
+  if(!selected) return;
+  const p=selected.userData;
+  const d=selected.position.distanceTo(p.home);
+  if(d<0.9){ // 吸附
+    selected.position.copy(p.home);
+    p.placed=true; placedMap[p.id]=true;
+    ghostMap[p.id].visible=false;
+    chipsEl.querySelector(`[data-part="${p.id}"]`).classList.remove('active');
+    chipsEl.querySelector(`[data-part="${p.id}"]`).classList.add('done');
+    placed++; score+=10; updateHUD(); showCard(p);
+    if(placed===PARTS.length){
+      quizBtn.disabled=false;
+      quizHint.innerHTML='全部拼装完成！👏 进入问答巩固知识 →';
+    }
+  } else if(d>2.5){
+    showToast('离目标点太远啦，再靠近发光位置～');
+  }
+  selected=null; controls.enabled=true; sceneEl.classList.remove('grabbing');
+});
+
+/* ============ HUD ============ */
+function updateHUD(){scoreVal.textContent=score; progVal.textContent=placed+'/'+PARTS.length;}
+function startTimer(){timer=setInterval(()=>{seconds++;
+  const m=Math.floor(seconds/60), s=String(seconds%60).padStart(2,'0');
+  timeVal.textContent=m+':'+s;},1000);}
+
+/* ============ 科普卡 ============ */
+function showCard(p){
+  document.getElementById('cardEmoji').textContent=p.emoji;
+  document.getElementById('cardName').textContent=p.name;
+  document.getElementById('cardDesc').textContent=p.desc;
+  mask.classList.add('show');
+}
+document.getElementById('cardOk').addEventListener('click',()=>mask.classList.remove('show'));
+
+let toastTimer=null;
+function showToast(msg){toast.textContent=msg; toast.classList.add('show');
+  clearTimeout(toastTimer); toastTimer=setTimeout(()=>toast.classList.remove('show'),1500);}
+
+/* ============ 按钮 ============ */
+document.getElementById('scatterBtn').addEventListener('click',scatter);
+document.getElementById('autoBtn').addEventListener('click',()=>{
+  if(timer===null) startTimer();
+  partGroups.forEach(g=>{
+    const p=g.userData; if(p.placed) return;
+    g.position.copy(p.home); p.placed=true; placedMap[p.id]=true;
+    ghostMap[p.id].visible=false;
+    chipsEl.querySelector(`[data-part="${p.id}"]`).classList.add('done');
+    placed++; score+=10;
+  });
+  updateHUD();
+  quizBtn.disabled=false; quizHint.innerHTML='已全部拼装！进入问答巩固知识 →';
+});
+
+/* ============ 问答 ============ */
+quizBtn.addEventListener('click',()=>{
+  quizWrap.classList.add('show'); quizBtn.disabled=true; quizBtn.textContent='问答进行中…';
+  renderQuiz();
+});
+let answeredQuiz=false;
+function renderQuiz(){
+  const q=QUIZ[quizIdx]; answeredQuiz=false;
+  qCard.innerHTML='<div class="progress">第 '+(quizIdx+1)+' / '+QUIZ.length+' 题 · 答对 +10 分</div>'+
+    '<div class="question">'+q.q+'</div><div class="opts" id="opts"></div>'+
+    '<div class="q-feedback" id="qfb"></div>';
+  const opts=qCard.querySelector('#opts');
+  q.opts.forEach((t,i)=>{const b=document.createElement('button');
+    b.className='opt'; b.textContent=t; b.addEventListener('click',()=>choose(i,b)); opts.appendChild(b);});
+}
+function choose(i,btn){
+  if(answeredQuiz) return; answeredQuiz=true;
+  const q=QUIZ[quizIdx]; const opts=qCard.querySelectorAll('.opt');
+  opts.forEach(o=>o.disabled=true); const fb=qCard.querySelector('#qfb');
+  if(i===q.a){btn.classList.add('correct'); quizScore+=10; score+=10; updateHUD();
+    fb.textContent='✅ 答对了！+10 分'; fb.className='q-feedback ok';}
+  else{btn.classList.add('wrong'); opts[q.a].classList.add('correct');
+    fb.textContent='❌ 正确答案：'+q.opts[q.a]; fb.className='q-feedback no';}
+  const next=document.createElement('button'); next.className='btn'; next.style.marginTop='14px';
+  next.textContent=(quizIdx<QUIZ.length-1)?'下一题 →':'查看成绩 🏆';
+  next.addEventListener('click',()=>{quizIdx++; quizIdx<QUIZ.length?renderQuiz():showResult();});
+  qCard.appendChild(next);
+}
+function showResult(){
+  quizWrap.classList.remove('show'); clearInterval(timer);
+  const max=PARTS.length*10+QUIZ.length*10;
+  const starN=score>=max-10?3:(score>=max*0.6?2:1);
+  const stars='⭐'.repeat(starN)+'☆'.repeat(3-starN);
+  qCard.innerHTML='<div class="result"><div class="score">'+score+
+    '<span style="font-size:18px;color:var(--sub)"> / '+max+'</span></div>'+
+    '<div class="stars">'+stars+'</div>'+
+    '<div class="line">拼装 '+PARTS.length+' 个结构 · 答对 '+(quizScore/10)+' / '+QUIZ.length+' 题</div>'+
+    '<div class="line">用时 '+timeVal.textContent+'</div>'+
+    '<div class="line" style="margin-top:10px;color:var(--teal)">你已掌握眼球的基本构造与功能，科学目标达成！</div>'+
+    '<button class="btn" style="margin-top:16px" onclick="location.reload()">再玩一次</button></div>';
+  quizWrap.classList.add('show');
+}
+
+/* ============ 渲染循环 + 自适应 ============ */
+function resize(){
+  const w=sceneEl.clientWidth, h=sceneEl.clientHeight;
+  renderer.setSize(w,h,false); camera.aspect=w/h; camera.updateProjectionMatrix();
+}
+window.addEventListener('resize',resize); resize();
+function loop(){requestAnimationFrame(loop); controls.update(); renderer.render(scene,camera);}
+loop();
+updateHUD();
+</script>
+</body>
+</html>

@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>眼球拆解大作战 · Demo 原型</title>
+<style>
+  :root{
+    --bg:#eef5fb;
+    --card:#ffffff;
+    --ink:#1f3a4d;
+    --sub:#5b7488;
+    --teal:#1aa3a3;
+    --blue:#2f8fd6;
+    --line:#d4e3ee;
+    --gold:#f5a623;
+    --ok:#36c275;
+    --err:#ff6b6b;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    font-family:"PingFang SC","Microsoft YaHei",system-ui,sans-serif;
+    background:radial-gradient(1200px 600px at 50% -10%,#ffffff,var(--bg));
+    color:var(--ink);
+    min-height:100vh;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:880px;margin:0 auto;padding:18px 16px 40px;}
+
+  /* 顶部 HUD */
+  header.hud{
+    display:flex;align-items:center;gap:14px;flex-wrap:wrap;
+    background:var(--card);border:1px solid var(--line);border-radius:16px;
+    padding:14px 18px;box-shadow:0 6px 20px rgba(31,58,77,.06);
+  }
+  .logo{font-size:26px;line-height:1;}
+  .title h1{font-size:20px;margin:0;letter-spacing:1px;}
+  .title p{margin:2px 0 0;font-size:12px;color:var(--sub);}
+  .stats{margin-left:auto;display:flex;gap:10px;flex-wrap:wrap;}
+  .pill{
+    background:#f3f9fd;border:1px solid var(--line);border-radius:999px;
+    padding:6px 14px;font-size:13px;color:var(--sub);white-space:nowrap;
+  }
+  .pill b{color:var(--ink);font-size:15px;}
+
+  /* 舞台 */
+  .stage{
+    margin-top:16px;display:grid;grid-template-columns:1.15fr .85fr;gap:16px;
+  }
+  @media(max-width:720px){.stage{grid-template-columns:1fr;}}
+
+  .panel{
+    background:var(--card);border:1px solid var(--line);border-radius:16px;
+    padding:16px;box-shadow:0 6px 20px rgba(31,58,77,.06);
+  }
+  .panel h2{font-size:14px;margin:0 0 12px;color:var(--sub);font-weight:600;}
+
+  /* 眼球图 */
+  .eye-box{position:relative;width:100%;aspect-ratio:600/460;
+    background:linear-gradient(180deg,#f8fcfd,#eaf4fb);border-radius:14px;overflow:hidden;}
+  .eye-svg{position:absolute;inset:0;width:100%;height:100%;}
+  .slot{
+    position:absolute;transform:translate(-50%,-50%);
+    width:64px;height:64px;border-radius:50%;
+    border:2px dashed #9cc1da;background:rgba(255,255,255,.55);
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    color:#7fa3bd;font-size:11px;text-align:center;cursor:default;
+    transition:transform .15s, box-shadow .15s, background .15s;
+  }
+  .slot .q{font-size:20px;line-height:1;}
+  .slot.hover{border-color:var(--blue);background:rgba(47,143,214,.12);
+    box-shadow:0 0 0 4px rgba(47,143,214,.15);transform:translate(-50%,-50%) scale(1.06);}
+  .slot.filled{border-style:solid;border-color:var(--ok);background:#eafaf1;color:var(--ink);}
+  .slot-emoji{font-size:20px;line-height:1;}
+  .slot-name{font-size:11px;margin-top:2px;font-weight:600;}
+
+  /* 零件托盘 */
+  .tray{margin-top:16px;}
+  .tray h2{font-size:14px;margin:0 0 12px;color:var(--sub);font-weight:600;}
+  .chips{display:flex;flex-wrap:wrap;gap:10px;}
+  .chip{
+    display:flex;align-items:center;gap:8px;
+    background:#f3f9fd;border:1px solid var(--line);border-radius:12px;
+    padding:8px 12px;font-size:13px;color:var(--ink);cursor:grab;
+    touch-action:none;user-select:none;box-shadow:0 2px 6px rgba(31,58,77,.05);
+    transition:box-shadow .15s, transform .05s;
+  }
+  .chip:hover{box-shadow:0 4px 12px rgba(31,58,77,.12);}
+  .chip:active{cursor:grabbing;}
+  .chip .emoji{font-size:20px;}
+  .chip.dragging{box-shadow:0 12px 28px rgba(31,58,77,.22);}
+  .chip.done{display:none;}
+
+  /* 按钮 */
+  .btn{
+    appearance:none;border:none;cursor:pointer;font-family:inherit;
+    background:var(--blue);color:#fff;font-size:14px;font-weight:600;
+    padding:11px 18px;border-radius:12px;box-shadow:0 6px 16px rgba(47,143,214,.3);
+    transition:transform .08s, filter .15s;
+  }
+  .btn:hover{filter:brightness(1.05);}
+  .btn:active{transform:translateY(1px);}
+  .btn.ghost{background:#eef4f9;color:var(--sub);box-shadow:none;border:1px solid var(--line);}
+  .btn:disabled{opacity:.5;cursor:not-allowed;filter:none;}
+
+  .quiz-bar{margin-top:16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;}
+  .quiz-bar .hint{font-size:13px;color:var(--sub);}
+  .quiz-bar .hint b{color:var(--teal);}
+
+  /* 科普卡弹窗 */
+  .mask{position:fixed;inset:0;background:rgba(15,34,48,.45);display:none;
+    align-items:center;justify-content:center;padding:18px;z-index:2000;}
+  .mask.show{display:flex;}
+  .card{
+    background:#fff;border-radius:18px;max-width:360px;width:100%;
+    padding:22px;box-shadow:0 20px 50px rgba(0,0,0,.25);
+    animation:pop .25s ease;
+  }
+  @keyframes pop{from{transform:scale(.9);opacity:0;}to{transform:scale(1);opacity:1;}}
+  .card .big{font-size:40px;}
+  .card h3{margin:8px 0 2px;font-size:18px;}
+  .card .tag{display:inline-block;font-size:12px;color:var(--teal);
+    background:#e6f6f6;border-radius:999px;padding:3px 10px;margin-bottom:8px;}
+  .card p{font-size:14px;line-height:1.7;color:#33536b;margin:10px 0 18px;}
+  .card .row{display:flex;justify-content:flex-end;}
+
+  /* 问答 */
+  .quiz-wrap{display:none;}
+  .quiz-wrap.show{display:block;}
+  .q-card{background:var(--card);border:1px solid var(--line);border-radius:16px;
+    padding:18px;box-shadow:0 6px 20px rgba(31,58,77,.06);}
+  .q-card .progress{font-size:12px;color:var(--sub);margin-bottom:6px;}
+  .q-card .question{font-size:16px;font-weight:600;margin:0 0 14px;line-height:1.5;}
+  .opts{display:grid;gap:10px;}
+  .opt{
+    text-align:left;background:#f6fafd;border:1px solid var(--line);
+    border-radius:12px;padding:12px 14px;font-size:14px;color:var(--ink);
+    cursor:pointer;transition:background .12s,border-color .12s;
+  }
+  .opt:hover{background:#eaf3fa;}
+  .opt.correct{background:#e9faf0;border-color:var(--ok);color:#1c7a48;}
+  .opt.wrong{background:#fdeaea;border-color:var(--err);color:#b53636;}
+  .opt:disabled{cursor:default;}
+  .q-feedback{margin-top:12px;font-size:13px;min-height:18px;}
+  .q-feedback.ok{color:var(--ok);}
+  .q-feedback.no{color:var(--err);}
+
+  /* 结算 */
+  .result{text-align:center;padding:10px 0;}
+  .result .score{font-size:46px;font-weight:800;color:var(--blue);}
+  .result .stars{font-size:28px;letter-spacing:4px;margin:6px 0;}
+  .result .line{font-size:14px;color:var(--sub);margin:4px 0;}
+  .toast{
+    position:fixed;left:50%;top:18px;transform:translateX(-50%);
+    background:var(--err);color:#fff;padding:10px 18px;border-radius:999px;
+    font-size:14px;box-shadow:0 8px 20px rgba(255,107,107,.35);
+    opacity:0;pointer-events:none;transition:opacity .2s, top .2s;z-index:3000;
+  }
+  .toast.show{opacity:1;top:26px;}
+  footer{margin-top:22px;text-align:center;font-size:12px;color:#9bb0c1;}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="hud">
+    <div class="logo">👁️</div>
+    <div class="title">
+      <h1>眼球拆解大作战</h1>
+      <p>拖拽拼装 · 认识眼球结构 · Demo 原型</p>
+    </div>
+    <div class="stats">
+      <div class="pill">得分 <b id="scoreVal">0</b></div>
+      <div class="pill">已拼装 <b id="progVal">0/0</b></div>
+      <div class="pill">用时 <b id="timeVal">0:00</b></div>
+    </div>
+  </header>
+
+  <div class="stage">
+    <!-- 左：眼球图 + 槽位 -->
+    <section class="panel">
+      <h2>① 把散落的零件拖到正确位置</h2>
+      <div class="eye-box" id="eyeBox">
+        <svg class="eye-svg" viewBox="0 0 600 460" preserveAspectRatio="xMidYMid meet">
+          <defs>
+            <radialGradient id="globe" cx="38%" cy="36%" r="75%">
+              <stop offset="0%" stop-color="#ffffff"/>
+              <stop offset="60%" stop-color="#e8f3fb"/>
+              <stop offset="100%" stop-color="#cfe6f5"/>
+            </radialGradient>
+            <radialGradient id="corneaG" cx="50%" cy="45%" r="60%">
+              <stop offset="0%" stop-color="#e2f4ff" stop-opacity=".95"/>
+              <stop offset="100%" stop-color="#a9dcf5" stop-opacity=".55"/>
+            </radialGradient>
+          </defs>
+
+          <!-- 巩膜（眼球外壁） -->
+          <ellipse cx="350" cy="230" rx="180" ry="155" fill="url(#globe)" stroke="#9bbcd1" stroke-width="3"/>
+          <!-- 玻璃体（内部） -->
+          <ellipse cx="378" cy="232" rx="150" ry="128" fill="#f4fbff" opacity=".7"/>
+          <!-- 视网膜（后壁弧线） -->
+          <path d="M 470 110 Q 540 230 470 350" fill="none" stroke="#f0a8b8" stroke-width="10" stroke-linecap="round" opacity=".85"/>
+          <!-- 视神经（后端伸出） -->
+          <path d="M 520 300 Q 565 305 590 300 L 590 330 Q 560 332 520 330 Z" fill="#f6c9a0" stroke="#e0a877" stroke-width="2"/>
+          <!-- 晶状体 -->
+          <ellipse cx="300" cy="230" rx="20" ry="42" fill="#bfe6f7" stroke="#7fc3e8" stroke-width="2" opacity=".9"/>
+          <!-- 虹膜 -->
+          <circle cx="252" cy="230" r="30" fill="#8ec5e8" stroke="#5fa9d4" stroke-width="2"/>
+          <circle cx="252" cy="230" r="11" fill="#1f3a4d"/>
+          <!-- 角膜（前端凸起） -->
+          <path d="M 178 230 Q 150 175 205 158 Q 222 198 206 230 Q 222 262 205 302 Q 150 285 178 230 Z"
+                fill="url(#corneaG)" stroke="#7fc3e8" stroke-width="2"/>
+        </svg>
+        <!-- 槽位由 JS 注入 -->
+      </div>
+    </section>
+
+    <!-- 右：零件托盘 + 问答入口 -->
+    <aside class="panel">
+      <h2>② 零件托盘</h2>
+      <div class="chips" id="chips"></div>
+
+      <div class="quiz-bar">
+        <span class="hint" id="quizHint">先拼装完 <b>6</b> 个零件，再开启问答 →</span>
+        <button class="btn" id="quizBtn" disabled>进入眼球功能问答</button>
+      </div>
+    </aside>
+  </div>
+
+  <!-- 问答区 -->
+  <div class="quiz-wrap" id="quizWrap" style="margin-top:16px;">
+    <div class="q-card" id="qCard"></div>
+  </div>
+
+  <footer>原型说明：本 Demo 用 2D SVG 近似呈现眼球剖面，仅作交互与流程验证；正式版可替换为 Three.js 真 3D 模型。</footer>
+</div>
+
+<!-- 科普卡 -->
+<div class="mask" id="mask">
+  <div class="card">
+    <div class="big" id="cardEmoji">🔍</div>
+    <span class="tag" id="cardTag">已解锁科普卡</span>
+    <h3 id="cardName">角膜</h3>
+    <p id="cardDesc"></p>
+    <div class="row"><button class="btn" id="cardOk">知道了，继续拼装</button></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ============ 数据 ============ */
+const PARTS = [
+  {id:'cornea', name:'角膜', emoji:'🔍', x:175, y:230,
+   desc:'眼睛最前方的透明“窗户”，呈弧形。光线首先穿过它进入眼球，并由它完成第一次折射聚焦。'},
+  {id:'iris', name:'虹膜', emoji:'🌈', x:252, y:230,
+   desc:'眼睛的“调色盘”，色素决定眼睛颜色（黑/棕/蓝/绿）。中央的孔是瞳孔，虹膜通过收缩调节进光量。'},
+  {id:'lens', name:'晶状体', emoji:'🔆', x:300, y:230,
+   desc:'富有弹性的双凸透镜，像相机镜头。通过变厚变薄改变焦距，把光线精准聚焦到视网膜上。'},
+  {id:'vitreous', name:'玻璃体', emoji:'💧', x:378, y:235,
+   desc:'填充眼球内部的透明胶状物，维持眼球圆润形状，并让光线顺利抵达后方的视网膜。'},
+  {id:'retina', name:'视网膜', emoji:'🖼️', x:470, y:175,
+   desc:'眼球后壁的“成像幕布”，布满感光细胞（视杆/视锥），把光信号转化为神经电信号。'},
+  {id:'optic', name:'视神经', emoji:'🧠', x:525, y:300,
+   desc:'连接眼睛与大脑的“光缆”，把视网膜生成的视觉信号传送到大脑，最终形成我们看到的图像。'},
+];
+
+const QUIZ = [
+  {q:'位于眼球最前方、负责让光线进入并初步折射的结构是？',
+   opts:['视网膜','角膜','视神经','玻璃体'], a:1},
+  {q:'像相机镜头一样，通过变厚变薄来调节焦距、聚焦成像的是？',
+   opts:['晶状体','虹膜','巩膜','瞳孔'], a:0},
+  {q:'布满感光细胞、相当于“成像幕布”的结构是？',
+   opts:['玻璃体','虹膜','视网膜','角膜'], a:2},
+  {q:'把眼睛看到的信号传给大脑，让我们“看见”东西的是？',
+   opts:['晶状体','视神经','角膜','瞳孔'], a:1},
+];
+
+/* ============ 状态 ============ */
+let score = 0;
+let placed = 0;
+let quizScore = 0;
+let quizIdx = 0;
+let seconds = 0;
+let timer = null;
+let answeredQuiz = false;
+const filledMap = {}; // partId -> bool
+
+/* ============ DOM ============ */
+const eyeBox = document.getElementById('eyeBox');
+const chipsEl = document.getElementById('chips');
+const scoreVal = document.getElementById('scoreVal');
+const progVal = document.getElementById('progVal');
+const timeVal = document.getElementById('timeVal');
+const quizHint = document.getElementById('quizHint');
+const quizBtn = document.getElementById('quizBtn');
+const quizWrap = document.getElementById('quizWrap');
+const qCard = document.getElementById('qCard');
+const mask = document.getElementById('mask');
+const toast = document.getElementById('toast');
+
+/* ============ 初始化槽位 ============ */
+PARTS.forEach(p=>{
+  const slot = document.createElement('div');
+  slot.className = 'slot';
+  slot.dataset.part = p.id;
+  slot.style.left = (p.x/600*100)+'%';
+  slot.style.top  = (p.y/460*100)+'%';
+  slot.innerHTML = '<span class="q">?</span>';
+  eyeBox.appendChild(slot);
+});
+
+/* ============ 初始化零件 ============ */
+PARTS.forEach(p=>{
+  const chip = document.createElement('div');
+  chip.className = 'chip';
+  chip.dataset.part = p.id;
+  chip.innerHTML = '<span class="emoji">'+p.emoji+'</span>'+p.name;
+  chipsEl.appendChild(chip);
+  chip.addEventListener('pointerdown', startDrag);
+});
+
+/* ============ 拖拽逻辑（指针事件，兼容鼠标/触屏） ============ */
+let drag = null, offX = 0, offY = 0;
+
+function startDrag(e){
+  if(timer===null) startTimer();
+  drag = e.currentTarget;
+  const r = drag.getBoundingClientRect();
+  offX = e.clientX - r.left;
+  offY = e.clientY - r.top;
+  drag.classList.add('dragging');
+  drag.style.position = 'fixed';
+  drag.style.width = r.width+'px';
+  drag.style.height = r.height+'px';
+  drag.style.zIndex = 1000;
+  moveDrag(e);
+  drag.setPointerCapture(e.pointerId);
+  drag.addEventListener('pointermove', moveDrag);
+  drag.addEventListener('pointerup', endDrag);
+}
+
+function moveDrag(e){
+  drag.style.left = (e.clientX - offX)+'px';
+  drag.style.top  = (e.clientY - offY)+'px';
+  // 高亮悬停的槽位
+  drag.style.visibility = 'hidden';
+  const t = document.elementFromPoint(e.clientX, e.clientY);
+  drag.style.visibility = '';
+  document.querySelectorAll('.slot.hover').forEach(s=>s.classList.remove('hover'));
+  const slot = t && t.closest && t.closest('.slot');
+  if(slot && !slot.classList.contains('filled')) slot.classList.add('hover');
+}
+
+function endDrag(e){
+  drag.removeEventListener('pointermove', moveDrag);
+  drag.removeEventListener('pointerup', endDrag);
+  drag.style.visibility = 'hidden';
+  const t = document.elementFromPoint(e.clientX, e.clientY);
+  drag.style.visibility = '';
+  document.querySelectorAll('.slot.hover').forEach(s=>s.classList.remove('hover'));
+
+  const slot = t && t.closest && t.closest('.slot');
+  const partId = drag.dataset.part;
+
+  if(slot && slot.dataset.part === partId && !filledMap[partId]){
+    // 正确放置
+    filledMap[partId] = true;
+    slot.classList.add('filled');
+    const p = PARTS.find(x=>x.id===partId);
+    slot.innerHTML = '<span class="slot-emoji">'+p.emoji+'</span><span class="slot-name">'+p.name+'</span>';
+    drag.style.display = 'none';
+    drag.classList.remove('dragging');
+    placed++;
+    score += 10;
+    updateHUD();
+    showCard(p);
+    if(placed === PARTS.length){
+      quizBtn.disabled = false;
+      quizHint.innerHTML = '全部拼装完成！👏 进入问答巩固知识 →';
+    }
+  } else {
+    // 错误 / 空投放 → 回托盘
+    resetChip(drag);
+    if(slot && slot.dataset.part !== partId){
+      showToast('位置不对，再试试～');
+    }
+  }
+  drag = null;
+}
+
+function resetChip(el){
+  el.classList.remove('dragging');
+  el.style.position=''; el.style.left=''; el.style.top='';
+  el.style.width=''; el.style.height=''; el.style.zIndex='';
+}
+
+/* ============ HUD ============ */
+function updateHUD(){
+  scoreVal.textContent = score;
+  progVal.textContent = placed+'/'+PARTS.length;
+}
+function startTimer(){
+  timer = setInterval(()=>{
+    seconds++;
+    const m = Math.floor(seconds/60);
+    const s = String(seconds%60).padStart(2,'0');
+    timeVal.textContent = m+':'+s;
+  },1000);
+}
+
+/* ============ 科普卡 ============ */
+function showCard(p){
+  document.getElementById('cardEmoji').textContent = p.emoji;
+  document.getElementById('cardName').textContent = p.name;
+  document.getElementById('cardDesc').textContent = p.desc;
+  mask.classList.add('show');
+}
+document.getElementById('cardOk').addEventListener('click', ()=>mask.classList.remove('show'));
+
+/* ============ Toast ============ */
+let toastTimer=null;
+function showToast(msg){
+  toast.textContent = msg;
+  toast.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=>toast.classList.remove('show'),1400);
+}
+
+/* ============ 问答 ============ */
+quizBtn.addEventListener('click', ()=>{
+  quizWrap.classList.add('show');
+  quizBtn.disabled = true;
+  quizBtn.textContent = '问答进行中…';
+  renderQuiz();
+});
+
+function renderQuiz(){
+  const q = QUIZ[quizIdx];
+  answeredQuiz = false;
+  qCard.innerHTML =
+    '<div class="progress">第 '+(quizIdx+1)+' / '+QUIZ.length+' 题 · 答对 +10 分</div>'+
+    '<div class="question">'+q.q+'</div>'+
+    '<div class="opts" id="opts"></div>'+
+    '<div class="q-feedback" id="qfb"></div>';
+  const opts = qCard.querySelector('#opts');
+  q.opts.forEach((text,i)=>{
+    const b = document.createElement('button');
+    b.className='opt'; b.textContent=text;
+    b.addEventListener('click',()=>choose(i,b));
+    opts.appendChild(b);
+  });
+}
+
+function choose(i, btn){
+  if(answeredQuiz) return;
+  answeredQuiz = true;
+  const q = QUIZ[quizIdx];
+  const opts = qCard.querySelectorAll('.opt');
+  opts.forEach(o=>o.disabled=true);
+  const fb = qCard.querySelector('#qfb');
+  if(i === q.a){
+    btn.classList.add('correct');
+    quizScore += 10;
+    score += 10;
+    updateHUD();
+    fb.textContent = '✅ 答对了！+10 分';
+    fb.className = 'q-feedback ok';
+  } else {
+    btn.classList.add('wrong');
+    opts[q.a].classList.add('correct');
+    fb.textContent = '❌ 正确答案：'+q.opts[q.a];
+    fb.className = 'q-feedback no';
+  }
+  const next = document.createElement('button');
+  next.className = 'btn';
+  next.style.marginTop = '14px';
+  next.textContent = (quizIdx < QUIZ.length-1) ? '下一题 →' : '查看成绩 🏆';
+  next.addEventListener('click', ()=>{
+    quizIdx++;
+    if(quizIdx < QUIZ.length) renderQuiz();
+    else showResult();
+  });
+  qCard.appendChild(next);
+}
+
+function showResult(){
+  quizWrap.classList.remove('show');
+  clearInterval(timer);
+  const max = PARTS.length*10 + QUIZ.length*10;
+  const starN = score>=max-10 ? 3 : (score>=max*0.6 ? 2 : 1);
+  const stars = '⭐'.repeat(starN) + '☆'.repeat(3-starN);
+  qCard.innerHTML =
+    '<div class="result">'+
+      '<div class="score">'+score+'<span style="font-size:18px;color:var(--sub)"> / '+max+'</span></div>'+
+      '<div class="stars">'+stars+'</div>'+
+      '<div class="line">拼装 '+PARTS.length+' 个结构 · 答对 '+ (quizScore/10) +' / '+QUIZ.length+' 题</div>'+
+      '<div class="line">用时 '+timeVal.textContent+'</div>'+
+      '<div class="line" style="margin-top:10px;color:var(--teal)">你已掌握眼球的基本构造与功能，科学目标达成！</div>'+
+      '<button class="btn" style="margin-top:16px" onclick="location.reload()">再玩一次</button>'+
+    '</div>';
+  quizWrap.classList.add('show');
+}
+
+updateHUD();
+</script>
+</body>
+</html>

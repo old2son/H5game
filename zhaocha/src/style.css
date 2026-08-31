@@ -1,0 +1,35 @@
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+:root {
+  --blue: #5b8def;
+  --green: #2ecc71;
+  --orange: #f39c12;
+  --red: #e74c3c;
+  --bg: #eaf2ff;
+  --card: #ffffff;
+  --text: #2c3e50;
+  --muted: #8a9bb0;
+}
+html,
+body {
+  height: 100%;
+}
+body {
+  font-family: 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif;
+  background: linear-gradient(160deg, #eaf2ff, #fdf3e7);
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+}
+#app {
+  max-width: 480px;
+  margin: 0 auto;
+  min-height: 100vh;
+  padding: 12px;
+}
+.page {
+  min-height: 100vh;
+}

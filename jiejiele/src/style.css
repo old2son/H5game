@@ -1,0 +1,8 @@
+/* 全局基础样式：让 #app 撑满视口，移动端竖屏体验 */
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body, #app { margin: 0; height: 100%; }
+body {
+  overflow: hidden;
+  background: #0b1622;
+  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
+}

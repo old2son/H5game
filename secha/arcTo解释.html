@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Canvas arcTo 图解</title>
+    <style>
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            background: #f5f5f5;
+            font-family: 'Segoe UI', sans-serif;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+        canvas {
+            display: block;
+            margin: 0 auto;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            background: #fafafa;
+        }
+        .legend {
+            margin-top: 16px;
+            font-size: 14px;
+            color: #333;
+            line-height: 1.8;
+        }
+        .legend span {
+            display: inline-block;
+            margin-right: 20px;
+        }
+        .dot-p0 { color: #d32f2f; }
+        .dot-p1 { color: #1976d2; }
+        .dot-p2 { color: #388e3c; }
+        .line-path { color: #000; font-weight: bold; }
+        .line-ref { color: #999; }
+        .arc { color: #e67e22; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <canvas id="myCanvas" width="300" height="150"></canvas>
+    <div class="legend">
+        <span class="dot-p0">● P0 (起点)</span>
+        <span class="dot-p1">● P1 (墙角)</span>
+        <span class="dot-p2">● P2 (方向)</span>
+        <span class="line-path">— 实际路径</span>
+        <span class="line-ref">- - 参考线</span>
+        <span class="arc">◠ 圆弧</span>
+    </div>
+</div>
+<script>
+    (function() {
+        const canvas = document.getElementById('myCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // 清空画布
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // ---------- 定义坐标点 ----------
+        const P0 = { x: 20, y: 20 };
+        const P1 = { x: 100, y: 20 };
+        const P2 = { x: 100, y: 80 };
+        const radius = 60;
+
+        // ---------- 1. 绘制灰色虚线参考线 (P0→P1 和 P1→P2) ----------
+        ctx.save();
+        ctx.setLineDash([4, 6]);
+        ctx.strokeStyle = '#bbb';
+        ctx.lineWidth = 1;
+
+        ctx.beginPath();
+        ctx.moveTo(P0.x, P0.y);
+        ctx.lineTo(P1.x, P1.y);
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.moveTo(P1.x, P1.y);
+        ctx.lineTo(P2.x, P2.y);
+        ctx.stroke();
+        ctx.restore();
+
+        // ---------- 2. 绘制实际路径 (使用 arcTo) ----------
+        ctx.save();
+        ctx.beginPath();
+        ctx.moveTo(P0.x, P0.y);
+        ctx.arcTo(P1.x, P1.y, P2.x, P2.y, radius);
+        ctx.lineTo(P2.x, P2.y);
+        ctx.strokeStyle = '#000';
+        ctx.lineWidth = 2.5;
+        ctx.stroke();
+        ctx.restore();
+
+        // ---------- 3. 突出显示圆弧部分 (用橙色描边加强) ----------
+        // 由于无法直接获取 arcTo 的切点，我们重新绘制同样的路径，但仅描边圆弧比较困难。
+        // 我们可以用另一种方式：从 P0 到 P1 的直线只画到切点，再画弧，再画到 P2，但这需要计算切点。
+        // 为了简化，我们直接绘制一个半透明的橙色弧线来叠加，但需要知道切点位置。
+        // 或者我们直接绘制一个圆角矩形的角，但这里我们采用更简单的方法：用橙色描边覆盖原有路径。
+        // 然而更好的方式是单独画出弧线部分，但需要计算切点。
+        // 这里我们采用计算切点来绘制一个独立的弧线，以突显圆弧。
+        // 计算切点：对于直角情况，切点距离 P1 的距离为 radius。
+        // 因为 P0->P1 水平，P1->P2 垂直，所以切点 A 在 (P1.x - radius, P1.y)，切点 B 在 (P1.x, P1.y + radius)
+        const A = { x: P1.x - radius, y: P1.y }; // (70, 20)
+        const B = { x: P1.x, y: P1.y + radius }; // (100, 50)
+
+        // 绘制高亮圆弧 (橙色)
+        ctx.save();
+        ctx.strokeStyle = '#e67e22';
+        ctx.lineWidth = 4;
+        // 圆弧从 A 到 B，圆心在 (P1.x - radius, P1.y + radius) 吗？对于直角，圆心在 (P1.x - radius, P1.y + radius)
+        // 但 arcTo 的圆弧圆心是 (P1.x - radius, P1.y + radius) 吗？实际上是的，因为与两条直角边相切。
+        // 对于这个特定例子，圆心在 (P1.x - radius, P1.y + radius) = (70, 50)
+        const center = { x: P1.x - radius, y: P1.y + radius };
+        // 从 A 到 B 的弧，角度从 -90° 到 0° (或 270° 到 360°)，但 canvas 角度是从正 x 轴顺时针
+        // A 相对于圆心向量 (-radius, 0) 角度 180°，B 相对于圆心 (0, radius) 角度 90° (或 -270°)
+        // 我们直接使用 arc 绘制从 A 到 B 的弧，起点角度为 Math.PI，终点角度为 Math.PI/2，逆时针或顺时针？
+        // 因为 arcTo 绘制的是从 A 到 B 的顺时针短弧（对于这个直角），所以我们应该用顺时针，且角度从 180° 到 90°（逆时针？）
+        // 我们来测试：从 A(70,20) 到 B(100,50)，圆心 (70,50)，弧是顺时针方向（从 A 到 B 绕右上）。
+        // 角度：A 在圆心正左，角度 π；B 在圆心正下，角度 π/2。顺时针从 π 到 π/2 是短弧。
+        ctx.beginPath();
+        ctx.arc(center.x, center.y, radius, Math.PI, Math.PI / 2, false); // false 表示顺时针
+        ctx.stroke();
+        ctx.restore();
+
+        // ---------- 4. 绘制三个点 (P0, P1, P2) ----------
+        function drawPoint(x, y, color, label) {
+            ctx.save();
+            ctx.fillStyle = color;
+            ctx.beginPath();
+            ctx.arc(x, y, 5, 0, 2 * Math.PI);
+            ctx.fill();
+            ctx.fillStyle = '#333';
+            ctx.font = '12px sans-serif';
+            ctx.textAlign = 'left';
+            ctx.textBaseline = 'bottom';
+            ctx.fillText(label, x + 8, y - 4);
+            ctx.restore();
+        }
+
+        drawPoint(P0.x, P0.y, '#d32f2f', 'P0');
+        drawPoint(P1.x, P1.y, '#1976d2', 'P1');
+        drawPoint(P2.x, P2.y, '#388e3c', 'P2');
+
+        // 额外标注切点 A 和 B (用灰色小点)
+        function drawSmallPoint(x, y, label) {
+            ctx.save();
+            ctx.fillStyle = '#888';
+            ctx.beginPath();
+            ctx.arc(x, y, 3, 0, 2 * Math.PI);
+            ctx.fill();
+            ctx.fillStyle = '#888';
+            ctx.font = '10px sans-serif';
+            ctx.textAlign = 'left';
+            ctx.textBaseline = 'bottom';
+            ctx.fillText(label, x + 5, y - 3);
+            ctx.restore();
+        }
+        drawSmallPoint(A.x, A.y, '切点A');
+        drawSmallPoint(B.x, B.y, '切点B');
+
+        // 绘制从 P0 到 A 的直线（实线的一部分）和从 B 到 P2 的直线，但它们已经包含在实际路径中，这里不重复绘制。
+
+        // 添加一个辅助标注：圆心 (可选)
+        ctx.save();
+        ctx.fillStyle = '#e67e22';
+        ctx.globalAlpha = 0.3;
+        ctx.beginPath();
+        ctx.arc(center.x, center.y, 3, 0, 2 * Math.PI);
+        ctx.fill();
+        ctx.fillStyle = '#e67e22';
+        ctx.globalAlpha = 1;
+        ctx.font = '10px sans-serif';
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'bottom';
+        ctx.fillText('圆心', center.x + 5, center.y - 3);
+        ctx.restore();
+
+        // 添加文字说明
+        ctx.save();
+        ctx.fillStyle = '#555';
+        ctx.font = '12px sans-serif';
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'top';
+        ctx.fillText('arcTo(100,20, 100,80, 30)', 10, 110);
+        ctx.restore();
+
+        // 为了更清晰，用虚线画一个矩形框表示原始直角？不需要。
+
+        console.log('绘制完成');
+    })();
+</script>
+</body>
+</html>
