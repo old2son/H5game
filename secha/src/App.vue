@@ -1,5 +1,11 @@
 <template>
 	<div class="game">
+		<div class="topbar">
+			<span class="brand">色差挑战</span>
+			<!-- <button class="icon-btn" @click="muted = !muted" :title="muted ? '开启音效' : '静音'">
+				{{ muted ? '🔇' : '🔊' }}
+			</button> -->
+		</div>
 		<header class="stats">
 			<div class="stat">
 				<span class="label">关卡</span><span class="value">{{ level }}</span>
@@ -9,6 +15,9 @@
 			</div>
 			<div class="stat">
 				<span class="label">最佳</span><span class="value">{{ best }}</span>
+			</div>
+			<div class="stat">
+				<span class="label">灵敏度最佳</span><span class="value">{{ bestSens }}</span>
 			</div>
 		</header>
 
@@ -28,7 +37,7 @@
 
 		</div>
 
-		<div v-if="phase === 'over'" class="overlay over-modal">
+		<div v-if="phase === 'over'" class="over-modal">
 			<div class="modal-card">
 				<h1 class="title over">游戏结束</h1>
 				<div class="result">
@@ -55,18 +64,28 @@
 						</div>
 					</div>
 				</div>
-				<p class="sens-desc">{{ sensDesc }}</p>
-				<div class="knowledge" v-if="currentCard">
-					<div class="k-head">📘 色觉小课堂 · {{ currentCard.title }}</div>
-					<p class="k-body">{{ currentCard.body }}</p>
-					<ul class="k-list">
-						<li v-for="item in currentCard.list" :key="item.name">
-							<b>{{ item.name }}</b><span>{{ item.desc }}</span>
-						</li>
-					</ul>
-					<p class="k-extra" v-if="currentCard.extra">💡 {{ currentCard.extra }}</p>
+			<p class="sens-desc">{{ sensDesc }}</p>
+			<div class="knowledge-wrap" v-if="showKnowledge && currentCard">
+					<div class="knowledge">
+						<div class="k-head">📘 色觉小课堂 · {{ currentCard.title }}</div>
+						<p class="k-body">{{ currentCard.body }}</p>
+						<ul class="k-list">
+							<li v-for="item in currentCard.list" :key="item.name">
+								<b>{{ item.name }}</b><span>{{ item.desc }}</span>
+							</li>
+						</ul>
+						<p class="k-extra" v-if="currentCard.extra">💡 {{ currentCard.extra }}</p>
+					</div>
+					<div class="k-actions">
+						<button class="link-btn" @click="nextCard">换一张</button>
+						<button class="link-btn" @click="showKnowledge = false">收起</button>
+					</div>
 				</div>
+			<button v-else class="link-btn" @click="showKnowledge = true">📘 查看色觉科普</button>
+			<div class="btn-row">
+				<button class="btn ghost" @click="sharePoster">📸 保存成绩卡</button>
 				<button class="btn" @click="onReplay">再来一局</button>
+			</div>
 			</div>
 		</div>
 
@@ -83,11 +102,19 @@ const phase = ref<Phase>('ready');
 const level = ref(1);
 const score = ref(0);
 
+// 历史最佳（单值记录）
 function loadBest(): number {
 	try {
 		return Number(localStorage.getItem('color-diff-best') || 0) || 0;
 	} catch {
 		return 0;
+	}
+}
+function saveBest(v: number) {
+	try {
+		localStorage.setItem('color-diff-best', String(v));
+	} catch {
+		/* ignore */
 	}
 }
 const best = ref(loadBest());
@@ -154,6 +181,175 @@ function loadBestSens(): number {
 }
 const bestSens = ref(loadBestSens());
 
+// 音效 / 震动反馈（Web Audio，无需素材）+ 静音开关 + 科普卡显隐
+const muted = ref(false);
+const showKnowledge = ref(true);
+let audioCtx: AudioContext | null = null;
+function ensureAudio() {
+	if (audioCtx) {
+		if (audioCtx.state === 'suspended') audioCtx.resume();
+		return;
+	}
+	try {
+		const Ctor =
+			window.AudioContext ||
+			(window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+		audioCtx = new Ctor();
+	} catch {
+		audioCtx = null;
+	}
+}
+function tone(freq: number, dur: number, type: OscillatorType = 'sine', gain = 0.05) {
+	if (muted.value || !audioCtx) return;
+	const o = audioCtx.createOscillator();
+	const g = audioCtx.createGain();
+	o.type = type;
+	o.frequency.value = freq;
+	o.connect(g);
+	g.connect(audioCtx.destination);
+	const t = audioCtx.currentTime;
+	g.gain.setValueAtTime(gain, t);
+	g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+	o.start(t);
+	o.stop(t + dur);
+}
+function sfxCorrect() {
+	tone(660, 0.1, 'sine');
+	setTimeout(() => tone(990, 0.12, 'sine'), 80);
+}
+function sfxWrong() {
+	tone(160, 0.3, 'sawtooth', 0.07);
+}
+function sfxLevel() {
+	tone(523, 0.09, 'triangle');
+	setTimeout(() => tone(784, 0.11, 'triangle'), 70);
+}
+function sfxOver() {
+	tone(330, 0.18, 'sine');
+	setTimeout(() => tone(247, 0.32, 'sine'), 140);
+}
+function buzz(pattern: number | number[]) {
+	if (!muted.value && typeof navigator.vibrate === 'function') navigator.vibrate(pattern);
+}
+function nextCard() {
+	let i = randInt(0, knowledgeCards.length - 1);
+	if (knowledgeCards.length > 1 && knowledgeCards[i] === currentCard.value) {
+		i = (i + 1) % knowledgeCards.length;
+	}
+	currentCard.value = knowledgeCards[i];
+}
+
+// 生成可下载的「成绩卡」PNG（纯 Canvas 绘制，无需任何素材）
+function sharePoster() {
+	const W = 720;
+	const H = 1080;
+	const c = document.createElement('canvas');
+	c.width = W;
+	c.height = H;
+	const g = c.getContext('2d');
+	if (!g) return;
+
+	const rr = (x: number, y: number, w: number, h: number, r: number) => {
+		g.beginPath();
+		g.moveTo(x + r, y);
+		g.arcTo(x + w, y, x + w, y + h, r);
+		g.arcTo(x + w, y + h, x, y + h, r);
+		g.arcTo(x, y + h, x, y, r);
+		g.arcTo(x, y, x + w, y, r);
+		g.closePath();
+	};
+
+	// 背景渐变
+	const grad = g.createLinearGradient(0, 0, 0, H);
+	grad.addColorStop(0, '#2b2350');
+	grad.addColorStop(1, '#16142e');
+	g.fillStyle = grad;
+	g.fillRect(0, 0, W, H);
+
+	// 顶部装饰色点
+	const dots = ['#ff7eb3', '#ffd166', '#9be7c4', '#7aa2ff', '#c792ea'];
+	dots.forEach((col, i) => {
+		g.fillStyle = col;
+		g.beginPath();
+		g.arc(W / 2 - 120 + i * 60, 64, 13, 0, Math.PI * 2);
+		g.fill();
+	});
+
+	// 标题 + 日期
+	const d = new Date();
+	const ds = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+	g.textAlign = 'center';
+	g.fillStyle = '#ffffff';
+	g.font = 'bold 46px sans-serif';
+	g.fillText('色差挑战 · 成绩卡', W / 2, 150);
+	g.font = '24px sans-serif';
+	g.fillStyle = 'rgba(255,255,255,0.6)';
+	g.fillText(ds, W / 2, 192);
+
+	// 大得分
+	g.fillStyle = '#ffd166';
+	g.font = 'bold 160px sans-serif';
+	g.fillText(String(score.value), W / 2, 380);
+	g.fillStyle = '#ffffff';
+	g.font = '28px sans-serif';
+	g.fillText('本局得分', W / 2, 430);
+
+	// 灵敏度等级胶囊
+	g.fillStyle = 'rgba(255,126,179,0.18)';
+	rr(W / 2 - 200, 470, 400, 72, 36);
+	g.fill();
+	g.fillStyle = '#ff7eb3';
+	g.font = 'bold 34px sans-serif';
+	g.fillText(`色觉灵敏度 ${sensitivity.value} · ${sensGrade.value}`, W / 2, 516);
+
+	// 2x2 统计卡
+	const stats: [string, string][] = [
+		['到达关卡', String(level.value)],
+		['历史最佳', String(best.value)],
+		['灵敏度最佳', String(bestSens.value)]
+	];
+	const bx = [60, 380];
+	const by = [600, 740];
+	const bw = 280;
+	const bh = 110;
+	stats.forEach((s, i) => {
+		const x = bx[i % 2];
+		const y = by[Math.floor(i / 2)];
+		g.fillStyle = 'rgba(255,255,255,0.06)';
+		rr(x, y, bw, bh, 18);
+		g.fill();
+		g.strokeStyle = 'rgba(255,255,255,0.14)';
+		g.lineWidth = 1.5;
+		rr(x, y, bw, bh, 18);
+		g.stroke();
+		g.textAlign = 'center';
+		g.fillStyle = 'rgba(255,255,255,0.6)';
+		g.font = '22px sans-serif';
+		g.fillText(s[0], x + bw / 2, y + 40);
+		g.fillStyle = '#ffffff';
+		g.font = 'bold 42px sans-serif';
+		g.fillText(s[1], x + bw / 2, y + 90);
+	});
+
+	// 底部标语
+	g.fillStyle = 'rgba(255,255,255,0.7)';
+	g.font = '28px sans-serif';
+	g.fillText('👀 你能分辨多小的色差？', W / 2, H - 90);
+
+	// 触发下载
+	try {
+		const url = c.toDataURL('image/png');
+		const a = document.createElement('a');
+		a.href = url;
+		a.download = `色差挑战成绩_${ds}.png`;
+		document.body.appendChild(a);
+		a.click();
+		document.body.removeChild(a);
+	} catch {
+		/* ignore */
+	}
+}
+
 const canvasRef = ref<HTMLCanvasElement | null>(null);
 
 // 棋盘逻辑尺寸（CSS 像素），随屏幕自适应
@@ -179,8 +375,8 @@ const state = reactive({
 });
 
 // 倒计时
-const timeMax = ref(5000);
-const timeLeft = ref(5000);
+const timeMax = ref(15000);
+const timeLeft = ref(15000);
 const pct = computed(() => (timeMax.value ? (timeLeft.value / timeMax.value) * 100 : 100));
 const barColor = computed(() => {
 	const r = timeLeft.value / (timeMax.value || 1);
@@ -194,19 +390,25 @@ function randInt(a: number, b: number) {
 	return Math.floor(Math.random() * (b - a + 1)) + a;
 }
 function gridForLevel(lv: number) {
-	return Math.min(2 + Math.floor((lv - 1) / 2), 10);
+	// return Math.min(2 + Math.floor((lv - 1) / 2), 10);
+	return Math.min(2 + Math.floor((lv - 1) / 3), 4);
 }
 function diffForLevel(lv: number) {
-	// 关卡越高，色差越小（更难点）
-	return Math.max(2.2, 13 - (lv - 1) * 0.7);
+	// 关卡越高，色差越小（更难点），下限 2.2%
+	return Math.max(2.2, 13 - (lv - 1) * 1.3);
 }
 function timeForLevel(lv: number) {
-	// 关卡越高，时间越紧
-	return Math.max(1800, 5200 - (lv - 1) * 220);
+	// 关卡越高，时间越紧，下限 1500ms
+	return Math.max(1500, Math.round(5200 - (lv - 1) * 220));
 }
 
 function calcBoard() {
-	const w = Math.min(window.innerWidth - 36, 460);
+	// PC（宽屏）用更大的棋盘，移动端保持紧凑
+	const cap = window.innerWidth >= 768 ? 560 : 460;
+	// 预留顶部栏/统计/计时条/间距，避免棋盘高度超过视口导致上下被遮
+	const reserve = 230;
+	const vh = Math.max(260, window.innerHeight - reserve);
+	const w = Math.min(window.innerWidth - 36, vh, cap);
 	boardSize.value = Math.max(260, Math.floor(w));
 }
 
@@ -289,6 +491,7 @@ function newLevel() {
 	state.target = randInt(0, n * n - 1);
 	state.clickedWrong = -1;
 	state.cell = (boardSize.value - GAP * (n + 1)) / n;
+	// 每关重置时限（难度曲线：关卡越高时间越紧）
 	timeMax.value = timeForLevel(level.value);
 	timeLeft.value = timeMax.value;
 	endTime = performance.now() + timeMax.value;
@@ -309,19 +512,20 @@ function tick() {
 function gameOver() {
 	phase.value = 'over';
 	cancelAnimationFrame(rafId);
+	showKnowledge.value = true;
+	sfxOver();
+	buzz([60, 40, 60, 40, 60]);
+	// 历史最佳（单值记录）
 	if (score.value > best.value) {
 		best.value = score.value;
-		try {
-			localStorage.setItem('color-diff-best', String(best.value));
-		} catch {
-			/* ignore */
-		}
+		saveBest(best.value);
 	}
 	// 计算色觉灵敏度评分：成功闯过的关卡越多，能分辨的最小色差越小 → 评分越高
 	const peak = Math.max(0, level.value - 1); // 成功清掉的关卡数
 	const minDiff = diffForLevel(Math.max(1, peak)); // 最小可辨亮度差（HSL %）
 	minDiffPct.value = peak >= 1 ? Number(minDiff.toFixed(1)) : 0;
-	const SENS_MAX = 16; // 色差降到下限(2.2%)所需闯过的关卡数
+	// const SENS_MAX = 16; // 色差降到下限(2.2%)所需闯过的关卡数
+	const SENS_MAX = 10;
 	const s = Math.min(100, Math.round((peak / SENS_MAX) * 100));
 	sensitivity.value = s;
 	if (s >= 85) {
@@ -377,14 +581,19 @@ function handlePoint(e: PointerEvent) {
 		state.clickedWrong = -2; // 答对高亮
 		draw();
 		score.value += state.n * 5;
+		sfxCorrect();
+		buzz(15);
 		setTimeout(() => {
 			level.value += 1;
 			newLevel();
+			sfxLevel();
 			locked = false;
 		}, 170);
 	} else {
 		state.clickedWrong = idx;
 		draw();
+		sfxWrong();
+		buzz([40, 30, 40]);
 		gameOver();
 	}
 }
@@ -396,6 +605,7 @@ function onReplay() {
 }
 
 function startGame() {
+	ensureAudio(); // 用户手势中解锁音频
 	level.value = 1;
 	score.value = 0;
 	locked = false;
@@ -430,7 +640,8 @@ onBeforeUnmount(() => {
 <style scoped>
 .game {
 	width: 100%;
-	max-width: 480px;
+	max-width: 768px;
+	margin: auto; /* 内容不足视口时垂直居中；超出时可滚动，避免上下被裁切 */
 	display: flex;
 	flex-direction: column;
 	align-items: center;
@@ -520,6 +731,7 @@ onBeforeUnmount(() => {
 	font-size: 12px;
 	color: var(--muted);
 }
+
 .btn {
 	margin-top: 6px;
 	padding: 12px 34px;
@@ -620,9 +832,7 @@ onBeforeUnmount(() => {
 	inset: 0;
 	z-index: 20;
 	display: flex;
-	align-items: center;
-	justify-content: center;
-	padding: 18px;
+	padding: 24px 18px;
 	background: rgba(12, 10, 28, 0.78);
 	backdrop-filter: blur(6px);
 	overflow-y: auto;
@@ -630,6 +840,7 @@ onBeforeUnmount(() => {
 .modal-card {
 	width: 100%;
 	max-width: 420px;
+	margin: auto; /* 居中且溢出时可滚动，避免移动端顶部被裁切 */
 	display: flex;
 	flex-direction: column;
 	align-items: center;
@@ -690,5 +901,108 @@ onBeforeUnmount(() => {
 .hint {
 	font-size: 13px;
 	color: var(--muted);
+}
+
+/* 按钮行（再来一局 + 保存成绩卡） */
+.btn-row {
+	display: flex;
+	gap: 12px;
+	flex-wrap: wrap;
+	justify-content: center;
+	width: 100%;
+}
+.btn.ghost {
+	background: transparent;
+	color: var(--text);
+	border: 1px solid rgba(255, 255, 255, 0.32);
+	box-shadow: none;
+}
+.btn.ghost:active {
+	transform: scale(0.96);
+}
+
+.topbar {
+	width: 100%;
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+}
+.brand {
+	font-size: 18px;
+	font-weight: 800;
+	letter-spacing: 1px;
+	color: var(--text);
+}
+.icon-btn {
+	width: 38px;
+	height: 38px;
+	border-radius: 12px;
+	border: 1px solid rgba(255, 255, 255, 0.14);
+	background: var(--card);
+	font-size: 18px;
+	line-height: 1;
+	cursor: pointer;
+	transition: transform 0.12s ease;
+}
+.icon-btn:active {
+	transform: scale(0.94);
+}
+
+.knowledge-wrap {
+	width: 100%;
+}
+.k-actions {
+	display: flex;
+	justify-content: center;
+	gap: 14px;
+	margin-top: 8px;
+}
+.link-btn {
+	background: none;
+	border: none;
+	color: #9be7c4;
+	font-size: 13px;
+	font-weight: 600;
+	cursor: pointer;
+	padding: 5px 10px;
+	border-radius: 8px;
+}
+.link-btn:active {
+	background: rgba(255, 255, 255, 0.08);
+}
+
+/* PC 适配：加宽布局、放大开始页与结果页、放大标题 */
+@media (min-width: 768px) {
+	.game {
+		max-width: 640px;
+	}
+	.board {
+		box-shadow: 0 30px 70px rgba(0, 0, 0, 0.45);
+	}
+	.modal-card {
+		max-width: 500px;
+		padding: 30px 28px;
+	}
+	.title {
+		font-size: 42px;
+	}
+	.title.over {
+		font-size: 38px;
+	}
+	.sub {
+		font-size: 17px;
+	}
+	.stat .value {
+		font-size: 24px;
+	}
+	.result b {
+		font-size: 20px;
+	}
+	.sens-num {
+		font-size: 46px;
+	}
+	.knowledge {
+		padding: 16px 18px;
+	}
 }
 </style>

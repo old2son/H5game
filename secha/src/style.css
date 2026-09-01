@@ -25,16 +25,20 @@ body {
   color: var(--text);
   background: linear-gradient(135deg, var(--bg-1) 0%, var(--bg-2) 50%, var(--bg-3) 100%);
   background-attachment: fixed;
-  display: flex;
-  align-items: center;
-  justify-content: center;
   min-height: 100vh;
-  padding: 16px;
-  overflow: hidden;
+  min-height: 100dvh;
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 
 #app {
   width: 100%;
+  min-height: 100dvh;
+  box-sizing: border-box;
+  padding: 16px;
   display: flex;
-  justify-content: center;
+  flex-direction: column;
+  align-items: center;
+  /* 内容不足视口时靠 .game 的 margin:auto 垂直居中；
+     内容超出视口时 flex + 滚动不会裁切顶部（避免上下被遮挡） */
 }
