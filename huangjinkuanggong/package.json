@@ -22,6 +22,7 @@
 		"axios": "^1.11.0",
 		"gsap": "^3.14.2",
 		"html2canvas": "^1.4.1",
+		"phaser": "^4.0.0",
 		"pinia": "^2.3.0",
 		"rollup-plugin-visualizer": "^6.0.3",
 		"vant": "^4.9.21",
