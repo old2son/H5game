@@ -360,6 +360,8 @@ let ctx: CanvasRenderingContext2D | null = null;
 let rafId = 0;
 let endTime = 0;
 let locked = false;
+let gameHue = 0; // 本局（一局游戏）固定色相，重开一局才换
+let lastSat = -1; // 上一关饱和度，用于保证每一关饱和度不同
 
 // 当前关卡数据
 const state = reactive({
@@ -483,8 +485,15 @@ function draw() {
 function newLevel() {
 	const n = gridForLevel(level.value);
 	state.n = n;
-	state.baseH = rand(0, 360);
-	state.baseS = rand(55, 82);
+	// 同一局只用一种色系：色相固定为本局 gameHue，重开一局后才换
+	state.baseH = gameHue;
+	// 每一关使用不同的饱和度（与上一关明显区分）
+	let s = rand(55, 82);
+	if (lastSat >= 0) {
+		while (Math.abs(s - lastSat) < 8) s = rand(55, 82);
+	}
+	lastSat = s;
+	state.baseS = s;
 	state.baseL = rand(40, 62);
 	state.diff = diffForLevel(level.value);
 	state.dir = Math.random() < 0.5 ? 1 : -1;
@@ -606,6 +615,9 @@ function onReplay() {
 
 function startGame() {
 	ensureAudio(); // 用户手势中解锁音频
+	// 开新的一局：重新选一个色相（同一局内不变），并重置饱和度记录
+	gameHue = rand(0, 360);
+	lastSat = -1;
 	level.value = 1;
 	score.value = 0;
 	locked = false;
