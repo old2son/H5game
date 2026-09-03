@@ -1,14 +1,23 @@
 import * as Phaser from 'phaser'
 
-/** 逻辑画布尺寸（与 phaser.html 中 CSS 自适应缩放匹配） */
-const W = 960
-const H = 600
+/** 世界（逻辑）尺寸：竖版 9:16，专为手机竖屏设计（cover 适配下竖屏视口上下铺满、左右裁切）。所有坐标基于 W/H，与画布物理尺寸解耦 */
+export const WORLD_W = 540
+export const WORLD_H = 960
+const W = WORLD_W
+const H = WORLD_H
+
+/** 设备像素比，上限 2 —— 再高对 2D 素材收益极小，显存开销却线性增长 */
+export const DPR = Math.min(typeof window === 'undefined' ? 1 : window.devicePixelRatio || 1, 2)
+
+/** 显示宽度硬上限（px）：移动端优先，桌面端也不超过 768 宽，避免在大屏上过度拉伸 */
+const MAX_CSS_W = 768
 
 /** 绳索悬挂点（矿井顶部卷扬机位置） */
 const PIVOT = { x: W / 2, y: 150 }
 
 const MIN_LEN = 34
-const MAX_ROPE = 660
+// 竖版世界更深，爪子需能伸到接近底部（PIVOT.y=150 → 底部约 H-14，最大有效长度由 maxReach 的边界限制决定）
+const MAX_ROPE = 860
 const MAX_ANGLE = 1.4 // 约 80°
 const SWING_SPEED = 1.7 // 摆动相位速度 rad/s
 const SHOOT_SPEED = 640 // 爪子伸出速度 px/s
@@ -18,6 +27,12 @@ const BOMB_RETRACT = 920 // 丢炸药后快速回收
 const GRAB_PAD = 5 // 抓取判定额外容差
 const LEVEL_TIME = 60 // 每关秒数
 const MAX_LEVEL = 8
+
+/**
+ * 素材视觉缩放系数：1 表示图片长边恰好等于碰撞直径 2r，视觉与判定严格一致。
+ * 若觉得画面太挤可下调到 0.9 左右（判定不变，视觉略小于判定圈）。
+ */
+const ITEM_VISUAL_RATIO = 1
 
 type ItemKind = 'gold' | 'rock' | 'diamond' | 'bag' | 'tnt'
 
@@ -80,40 +95,180 @@ export class GameScene extends Phaser.Scene {
   private txtLevel!: Phaser.GameObjects.Text
   private txtHint!: Phaser.GameObjects.Text
   private overlay: Phaser.GameObjects.Container | null = null
+  /** 当前覆盖层按钮的回调，使空格/点击可直接确认，而不必精确点中按钮 */
+  private overlayAction: (() => void) | null = null
   private audioCtx?: AudioContext
+  /** 需要跟随画布缩放重建纹理的常驻文字（HUD） */
+  private hudTexts: Phaser.GameObjects.Text[] = []
+  /** 上一次应用到文字的纹理分辨率，避免每帧重复重建纹理 */
+  private textRes = 0
+  /** HUD 安全内边距（世界单位）：cover 模式下画面会被裁切，HUD 须缩进到可见区 */
+  private hudSafe = { x: 10, y: 10 }
 
   constructor() {
     super('game')
   }
 
+  /**
+   * 自适应画布：让 canvas 物理像素 = CSS 显示尺寸 × DPR，实现 1:1 采样。
+   *
+   * 世界为竖版 540×960（9:16），scale.mode = NONE，由本方法按容器算适配比例：
+   * - 视口比世界更窄（手机竖屏，viewRatio ≤ 9:16）→ cover：高度铺满、左右裁切
+   * - 视口比世界更宽（PC / 平板横屏，viewRatio > 9:16）→ contain：完整显示、左右留白
+   * 这样 PC 上保持竖屏比例且高度自适应占满，HUD / 物品不被裁切；手机维持上下铺满。
+   * 所有坐标按 W/H 编写，与画布物理尺寸解耦，无需改动。
+   */
+  private fitCamera() {
+    const parent = this.game.canvas.parentElement
+    // 显示宽度硬上限 MAX_CSS_W：移动端按屏宽自适应，桌面端不超过 768 宽
+    const availW = Math.min(parent?.clientWidth || window.innerWidth || W, MAX_CSS_W)
+    const availH = parent?.clientHeight || window.innerHeight || H
+    // cover 模式：画布 = 视口尺寸，世界等比填满视口（较小边对齐、较大边裁切溢出）。
+    // 竖屏手机下高度对齐 → 上下铺满、左右裁掉少许（体验优先，代价是边缘物品不入画）。
+    const cssW = Math.max(Math.floor(availW), 1)
+    const cssH = Math.max(Math.floor(availH), 1)
+    // 画布物理像素 = CSS 尺寸 × DPR，做到 1:1 采样。
+    // 此前 FIT 模式不乘 DPR，高清屏下画布被浏览器二次放大而整体发虚。
+    const devW = Math.max(Math.round(cssW * DPR), 1)
+    const devH = Math.max(Math.round(cssH * DPR), 1)
+
+    if (this.scale.width !== devW || this.scale.height !== devH) {
+      this.scale.setGameSize(devW, devH)
+    }
+    // NONE 模式下 Phaser 会把 canvas 样式设为设备像素尺寸，这里改回 CSS 逻辑尺寸，
+    // 使每个 CSS 像素对应 DPR 个物理像素（高清屏锐利）。
+    const canvas = this.game.canvas
+    canvas.style.width = cssW + 'px'
+    canvas.style.height = cssH + 'px'
+
+    const cam = this.cameras.main
+    // 自适应策略：视口比世界更窄（手机竖屏）→ cover 上下铺满、左右裁切；
+    // 视口比世界更宽（PC / 横屏）→ contain 完整显示、左右留白（竖屏比例、高度自适应占满）。
+    const worldRatio = W / H
+    const viewRatio = devW / devH
+    const z = viewRatio <= worldRatio ? Math.max(devW / W, devH / H) : Math.min(devW / W, devH / H)
+    cam.setZoom(z)
+    cam.centerOn(W / 2, H / 2)
+
+    // cover 下可见世界范围：居中裁切，算出左右/上下被裁掉的世界单位，
+    // 用作 HUD 安全内边距，保证角落文字不被裁切。
+    const visW = devW / z
+    const visH = devH / z
+    this.hudSafe = {
+      x: Math.max((W - visW) / 2, 0) + 10,
+      y: Math.max((H - visH) / 2, 0) + 10,
+    }
+    this.layoutHud()
+
+    // 文字是预渲染位图纹理：相机 zoom 放大后纹理会被拉伸发虚，
+    // 按实际缩放倍率重建纹理（上限 3，避免 4K 屏下纹理过大）。
+    const res = Math.min(z, 3)
+    if (Math.abs(res - this.textRes) > 0.01) {
+      this.textRes = res
+      for (const t of this.hudTexts) t.setResolution(res)
+    }
+  }
+
+  /** 根据 cover 裁切量，把 HUD 文字缩进到可见区（角落不被裁掉） */
+  private layoutHud() {
+    if (!this.txtMoney) return
+    const { x: sx, y: sy } = this.hudSafe
+    this.txtMoney.setPosition(sx, sy)
+    this.txtGoal.setPosition(sx, sy + 28)
+    this.txtTime.setPosition(W / 2, sy).setOrigin(0.5, 0)
+    this.txtLevel.setPosition(W - sx, sy).setOrigin(1, 0)
+    this.txtHint.setPosition(W / 2, H - sy).setOrigin(0.5, 1)
+  }
+
+  /** 新建文字时按当前渲染倍率设定纹理分辨率，并按需登记到 HUD 列表 */
+  private mkText(
+    x: number,
+    y: number,
+    text: string,
+    style: Phaser.Types.GameObjects.Text.TextStyle,
+    persistent = false,
+  ) {
+    const t = this.add.text(x, y, text, style)
+    const res = Math.min((this.cameras.main?.zoom || 1) * DPR, 3)
+    if (res > 1) t.setResolution(res)
+    if (persistent) this.hudTexts.push(t)
+    return t
+  }
+
+  /**
+   * 等比缩放精灵：让长边等于 target，保持素材原始宽高比。
+   * 素材已裁紧到内容边界且多为非正方形，用 setDisplaySize(w, h) 会拉伸变形。
+   */
+  private fitSprite(sprite: Phaser.GameObjects.Image, target: number) {
+    const s = target / Math.max(sprite.width, sprite.height)
+    sprite.setScale(s)
+    return sprite
+  }
+
+  preload() {
+    // 物品按 kind 共用纹理（金块大中小/石头大小均按 def.r 缩放显示）
+    this.load.image('item-gold', '/assets/gold.png')
+    this.load.image('item-rock', '/assets/rock.png')
+    this.load.image('item-diamond', '/assets/diamond.png')
+    this.load.image('item-bag', '/assets/bag.png')
+    this.load.image('item-tnt', '/assets/tnt.png')
+    this.load.image('miner', '/assets/miner.png')
+  }
+
   create() {
     this.cameras.main.setBackgroundColor('#1a120b')
+
+    // 先按容器定好画布尺寸与 camera zoom，文字才能按正确倍率建纹理
+    this.hudTexts = []
+    this.fitCamera()
+
+    // 防止首屏跳变：画布初始 visibility:hidden（见 phaser.html），
+    // 等首帧「正确布局」渲染完成（POST_RENDER 事件，保证已用当前相机画过一帧）后
+    // 再翻为可见，杜绝「默认位置先显示 → 调整 → 正确位置」的中间态被看到。
+    const canvasEl = this.game.canvas
+    const reveal = () => {
+      if (canvasEl) canvasEl.style.visibility = 'visible'
+    }
+    this.game.events.once(Phaser.Core.Events.POST_RENDER, reveal)
+    // 兜底：极端情况下若 500ms 内 POST_RENDER 未触发，直接显示避免永久隐藏
+    this.time.delayedCall(500, reveal)
+
     this.bgGfx = this.add.graphics().setDepth(0)
     this.drawBackground()
-    this.drawMiner()
 
     this.fx = this.add.graphics().setDepth(8)
-    this.makeTextures()
+
+    // 矿工图片精灵（替代原 drawMiner 矢量绘制），置于 PIVOT 上方
+    // 素材裁紧后不再是正方形，须等比缩放，否则会被拉扁
+    this.fitSprite(this.add.image(PIVOT.x, PIVOT.y - 38, 'miner').setDepth(7), 84)
 
     const style = { fontFamily: 'sans-serif', fontSize: '20px', color: '#ffe9a8' } as const
-    this.txtMoney = this.add.text(20, 14, '', style).setDepth(20)
-    this.txtGoal = this.add.text(20, 42, '', { ...style, fontSize: '15px', color: '#c9b48f' }).setDepth(20)
-    this.txtTime = this.add
-      .text(W / 2, 14, '', { ...style, fontSize: '22px', color: '#fff' })
+    this.txtMoney = this.mkText(20, 14, '', style, true).setDepth(20)
+    this.txtGoal = this.mkText(20, 42, '', { ...style, fontSize: '15px', color: '#c9b48f' }, true).setDepth(
+      20,
+    )
+    this.txtTime = this.mkText(W / 2, 14, '', { ...style, fontSize: '22px', color: '#fff' }, true)
       .setOrigin(0.5, 0)
       .setDepth(20)
-    this.txtLevel = this.add
-      .text(W - 20, 14, '', { ...style, fontSize: '18px', color: '#ffd447' })
+    this.txtLevel = this.mkText(W - 20, 14, '', { ...style, fontSize: '18px', color: '#ffd447' }, true)
       .setOrigin(1, 0)
       .setDepth(20)
-    this.txtHint = this.add
-      .text(W / 2, H - 26, '空格 / 点击 放爪    ·    X 丢弃石头或炸药', {
+    this.txtHint = this.mkText(
+      W / 2,
+      H - 26,
+      '空格 / 点击 放爪    ·    X 丢弃石头或炸药',
+      {
         fontFamily: 'sans-serif',
         fontSize: '15px',
         color: '#d8c7a3',
-      })
+      },
+      true,
+    )
       .setOrigin(0.5)
       .setDepth(20)
+
+    // HUD 文字已建好，按当前 cover 裁切量定位到可见区
+    this.layoutHud()
 
     this.hook = { angle: 0, length: MIN_LEN, state: 'swing', grabbed: null, retractSpeed: RETRACT_BASE }
 
@@ -122,90 +277,37 @@ export class GameScene extends Phaser.Scene {
     this.input.keyboard?.on('keydown-SPACE', () => this.onAction())
     this.input.keyboard?.on('keydown-X', () => this.onBomb())
 
+    // 窗口尺寸变化时重新适配画布（Scale.NONE 不会自动跟随容器）
+    const onResize = () => this.fitCamera()
+    window.addEventListener('resize', onResize)
+    this.scale.on('resize', onResize)
+    this.events.once('shutdown', () => {
+      window.removeEventListener('resize', onResize)
+      this.scale.off('resize', onResize)
+    })
+
+    if (import.meta.env.DEV) {
+      const tm = this.textures
+      console.log(
+        '[PHASER]',
+        Phaser.VERSION,
+        JSON.stringify({
+          miner: tm.exists('miner'),
+          gold: tm.exists('item-gold'),
+          rock: tm.exists('item-rock'),
+          diamond: tm.exists('item-diamond'),
+          bag: tm.exists('item-bag'),
+          tnt: tm.exists('item-tnt'),
+        }),
+      )
+      // 测试钩子：暴露场景便于无头断言（prod 下不存在，会被摇树移除）
+      ;(window as unknown as { __scene: GameScene }).__scene = this
+    }
+
     this.showStart()
   }
 
-  // ---------- 资源生成（零素材，运行时绘制纹理）----------
-
-  private makeTextures() {
-    for (const [type, def] of Object.entries(DEFS)) {
-      const pad = 6
-      const size = (def.r + pad) * 2
-      const c = def.r + pad
-      const g = this.make.graphics({ x: 0, y: 0 }, false)
-      if (def.kind === 'gold') this.drawGold(g, c, def.r, def.color)
-      else if (def.kind === 'rock') this.drawRock(g, c, def.r, def.color)
-      else if (def.kind === 'diamond') this.drawDiamond(g, c, def.r, def.color)
-      else if (def.kind === 'bag') this.drawBag(g, c, def.r, def.color)
-      else if (def.kind === 'tnt') this.drawTnt(g, c, def.r, def.color)
-      g.generateTexture('item-' + type, size, size)
-      g.destroy()
-    }
-  }
-
-  private drawGold(g: Phaser.GameObjects.Graphics, c: number, r: number, color: number) {
-    g.fillStyle(0x8a5a12, 1)
-    g.fillCircle(c, c + 2, r)
-    g.fillStyle(color, 1)
-    g.fillCircle(c, c, r)
-    g.fillStyle(0xffffff, 0.35)
-    g.fillCircle(c - r * 0.32, c - r * 0.32, r * 0.34)
-  }
-
-  private drawRock(g: Phaser.GameObjects.Graphics, c: number, r: number, color: number) {
-    g.fillStyle(0x4a463f, 1)
-    g.fillCircle(c, c + 2, r)
-    g.fillStyle(color, 1)
-    g.fillCircle(c, c, r)
-    g.fillStyle(0x000000, 0.18)
-    g.fillCircle(c + r * 0.3, c + r * 0.25, r * 0.4)
-    g.fillStyle(0xffffff, 0.16)
-    g.fillCircle(c - r * 0.3, c - r * 0.3, r * 0.3)
-  }
-
-  private drawDiamond(g: Phaser.GameObjects.Graphics, c: number, r: number, color: number) {
-    const pts = (s: number): Phaser.Math.Vector2[] => [
-      new Phaser.Math.Vector2(c, c - r * s),
-      new Phaser.Math.Vector2(c + r * 0.85 * s, c),
-      new Phaser.Math.Vector2(c, c + r * s),
-      new Phaser.Math.Vector2(c - r * 0.85 * s, c),
-    ]
-    g.fillStyle(0x0a6b86, 1)
-    g.fillPoints(pts(1.12), true)
-    g.fillStyle(color, 1)
-    g.fillPoints(pts(1), true)
-    g.fillStyle(0xffffff, 0.5)
-    g.fillTriangle(c, c - r, c + r * 0.4, c - r * 0.1, c, c)
-  }
-
-  private drawBag(g: Phaser.GameObjects.Graphics, c: number, r: number, color: number) {
-    g.fillStyle(0x6e3d12, 1)
-    g.fillRoundedRect(c - r * 0.85, c - r * 0.7, r * 1.7, r * 1.7, 7)
-    g.fillStyle(color, 1)
-    g.fillRoundedRect(c - r * 0.78, c - r * 0.55, r * 1.56, r * 1.5, 6)
-    g.fillStyle(0x3d2208, 1)
-    g.fillRect(c - r * 0.4, c - r * 0.85, r * 0.8, r * 0.3) // 扎口
-    g.fillStyle(0xffe27a, 0.9)
-    g.fillCircle(c + r * 0.3, c + r * 0.1, r * 0.16) // 金币露头
-  }
-
-  private drawTnt(g: Phaser.GameObjects.Graphics, c: number, r: number, color: number) {
-    g.fillStyle(0x7a1a12, 1)
-    g.fillRoundedRect(c - r * 0.7, c - r + 2, r * 1.4, r * 2, 4)
-    g.fillStyle(color, 1)
-    g.fillRoundedRect(c - r * 0.66, c - r, r * 1.32, r * 2 - 2, 4)
-    g.fillStyle(0xffe27a, 1)
-    g.fillRect(c - r * 0.5, c - r * 0.15, r * 1.0, r * 0.3) // 标签带
-    g.lineStyle(3, 0x3d2208, 1)
-    g.beginPath()
-    g.moveTo(c, c - r)
-    g.lineTo(c + r * 0.4, c - r - r * 0.55)
-    g.strokePath()
-    g.fillStyle(0xff8a3d, 1)
-    g.fillCircle(c + r * 0.4, c - r - r * 0.55, 3) // 引线头
-  }
-
-  // ---------- 背景与矿工 ----------
+  // ---------- 背景 ----------
 
   private drawBackground() {
     const g = this.bgGfx
@@ -220,34 +322,17 @@ export class GameScene extends Phaser.Scene {
     // 泥土层
     g.fillGradientStyle(0x6b4a2b, 0x6b4a2b, 0x3a2616, 0x3a2616, 1)
     g.fillRect(0, PIVOT.y, W, H - PIVOT.y)
-    // 泥土纹理点
+    // 泥土纹理点（竖版面积更大，按面积增密）
     g.fillStyle(0x000000, 0.12)
-    for (let i = 0; i < 90; i++) {
+    const speckN = Math.round((W * (H - PIVOT.y)) / 3200)
+    for (let i = 0; i < speckN; i++) {
       const x = (i * 137) % W
       const y = PIVOT.y + 20 + ((i * 211) % (H - PIVOT.y - 30))
       g.fillCircle(x, y, 3 + (i % 3))
     }
   }
 
-  private drawMiner() {
-    const g = this.add.graphics().setDepth(7)
-    const x = PIVOT.x
-    const y = PIVOT.y
-    // 卷扬机架
-    g.fillStyle(0x3a2c1c, 1)
-    g.fillRect(x - 26, y - 8, 52, 14)
-    // 身体
-    g.fillStyle(0x2f6fb0, 1)
-    g.fillRoundedRect(x - 13, y - 30, 26, 26, 6)
-    // 头
-    g.fillStyle(0xf2c9a0, 1)
-    g.fillCircle(x, y - 38, 12)
-    // 头盔
-    g.fillStyle(0xffd447, 1)
-    g.fillCircle(x, y - 42, 13)
-    g.fillRect(x - 14, y - 42, 28, 5)
-  }
-
+  
   // ---------- 几何工具 ----------
 
   private dir() {
@@ -283,6 +368,7 @@ export class GameScene extends Phaser.Scene {
 
   private startLevel(level: number) {
     this.clearItems()
+    this.clearOverlay() // 任何路径进入关卡都不留遮罩
     this.level = level
     this.timeLeft = LEVEL_TIME
     this.spawnItems(level)
@@ -314,7 +400,11 @@ export class GameScene extends Phaser.Scene {
       const type = pool[Math.floor(Math.random() * pool.length)]
       const def = DEFS[type]
       const r = def.r
-      const x = Phaser.Math.Between(r + 24, W - r - 24)
+      // cover 模式下左右会被裁切，物品须生成在可见区（hudSafe.x 为左右被裁的世界单位）
+      const inset = this.hudSafe.x
+      const left = r + 24 + inset
+      const right = W - r - 24 - inset
+      const x = left <= right ? Phaser.Math.Between(left, right) : W / 2
       const y = Phaser.Math.Between(PIVOT.y + 70, H - r - 22)
       let ok = true
       for (const it of this.items) {
@@ -325,7 +415,9 @@ export class GameScene extends Phaser.Scene {
       }
       if (!ok) continue
       const value = type === 'bag' ? Phaser.Math.Between(60, 320) : def.value
-      const sprite = this.add.image(x, y, 'item-' + type).setDepth(5)
+      // 等比缩放：让素材长边等于碰撞直径 def.r*2，保持宽高比不被拉伸
+      const sprite = this.add.image(x, y, 'item-' + def.kind).setDepth(5)
+      this.fitSprite(sprite, def.r * ITEM_VISUAL_RATIO * 2)
       this.items.push({
         type,
         def,
@@ -458,6 +550,14 @@ export class GameScene extends Phaser.Scene {
   }
 
   private onAction() {
+    // 覆盖层（开始 / 过关 / 失败 / 通关）状态下，空格与点击等同于按下画面上的按钮
+    if (this.overlayAction) {
+      const fn = this.overlayAction
+      this.overlayAction = null
+      this.clearOverlay()
+      fn()
+      return
+    }
     if (this.state === 'playing' && this.hook.state === 'swing') {
       this.hook.state = 'shoot'
     }
@@ -515,8 +615,12 @@ export class GameScene extends Phaser.Scene {
   }
 
   private floatText(x: number, y: number, text: string, color: string) {
-    const t = this.add
-      .text(x, y, text, { fontFamily: 'sans-serif', fontSize: '26px', color, fontStyle: 'bold' })
+    const t = this.mkText(x, y, text, {
+      fontFamily: 'sans-serif',
+      fontSize: '26px',
+      color,
+      fontStyle: 'bold',
+    })
       .setOrigin(0.5)
       .setDepth(25)
     this.tweens.add({
@@ -570,47 +674,42 @@ export class GameScene extends Phaser.Scene {
     this.clearOverlay()
     const layer = this.add.container(0, 0).setDepth(30)
     const bg = this.add.rectangle(W / 2, H / 2, W, H, 0x000000, 0.6)
-    const t = this.add
-      .text(W / 2, H / 2 - 78, title, {
-        fontFamily: 'sans-serif',
-        fontSize: '40px',
-        color: '#ffd447',
-        fontStyle: 'bold',
-      })
-      .setOrigin(0.5)
-    const body = this.add
-      .text(W / 2, H / 2 - 6, lines.join('\n'), {
-        fontFamily: 'sans-serif',
-        fontSize: '19px',
-        color: '#f5e9d6',
-        align: 'center',
-        lineSpacing: 8,
-      })
-      .setOrigin(0.5)
+    const t = this.mkText(W / 2, H / 2 - 78, title, {
+      fontFamily: 'sans-serif',
+      fontSize: '40px',
+      color: '#ffd447',
+      fontStyle: 'bold',
+    }).setOrigin(0.5)
+    const body = this.mkText(W / 2, H / 2 - 6, lines.join('\n'), {
+      fontFamily: 'sans-serif',
+      fontSize: '19px',
+      color: '#f5e9d6',
+      align: 'center',
+      lineSpacing: 8,
+    }).setOrigin(0.5)
     const btn = this.add
       .rectangle(W / 2, H / 2 + 88, 220, 58, 0xffd447)
       .setInteractive({ useHandCursor: true })
-    const btnTxt = this.add
-      .text(W / 2, H / 2 + 88, btnLabel, {
-        fontFamily: 'sans-serif',
-        fontSize: '22px',
-        color: '#1a120b',
-        fontStyle: 'bold',
-      })
-      .setOrigin(0.5)
+    const btnTxt = this.mkText(W / 2, H / 2 + 88, btnLabel, {
+      fontFamily: 'sans-serif',
+      fontSize: '22px',
+      color: '#1a120b',
+      fontStyle: 'bold',
+    }).setOrigin(0.5)
     btn.on('pointerover', () => btn.setFillStyle(0xffe27a))
     btn.on('pointerout', () => btn.setFillStyle(0xffd447))
-    btn.on('pointerdown', () => {
-      this.clearOverlay()
-      onBtn()
-    })
+    // 走 onAction 统一入口：场景级 pointerdown 与按钮自身 pointerdown 都可能触发，
+    // onAction 内部消费后即置空，保证只执行一次
+    btn.on('pointerdown', () => this.onAction())
     layer.add([bg, t, body, btn, btnTxt])
     this.overlay = layer
+    this.overlayAction = onBtn
   }
 
   private clearOverlay() {
     this.overlay?.destroy()
     this.overlay = null
+    this.overlayAction = null
   }
 
   private showStart() {
