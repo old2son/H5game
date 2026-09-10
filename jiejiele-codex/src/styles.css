@@ -15,11 +15,18 @@ body {
 main, #game { display: grid; place-items: center; }
 #game canvas {
   display: block;
+  /* 390 / 844 = 0.46209 → 高度受限时按高度反推宽度 */
+  width: min(100%, 46.21vh) !important;
+  height: min(100%, 216.42vw) !important;
+  /* 小视口单位：iOS Safari 地址栏收缩时不跳动 */
   width: min(100%, 46.21svh) !important;
   height: min(100%, 216.42svw) !important;
   max-width: 100%;
   max-height: 100%;
+  /* 兜底：禁止任何脚本再写 margin 造成二次偏移，居中只由 #game 的 place-items 负责 */
+  margin: 0 !important;
   touch-action: none;
+  border-radius: 18px;
   box-shadow: 0 22px 70px rgba(33, 88, 126, .22);
 }
 .rotate {

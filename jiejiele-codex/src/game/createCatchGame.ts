@@ -15,9 +15,12 @@ export function createCatchGame(parent: string) {
     antialias: true,
     antialiasGL: true,
     powerPreference: 'high-performance',
+    // 显示尺寸与居中完全交给 styles.css 处理（svh/svw 在移动端更稳）。
+    // 这里必须用 NONE + NO_CENTER：FIT 模式下 Phaser 会额外写 canvas 的 marginLeft/marginTop 做居中，
+    // 与 CSS 的 place-items:center 叠加后会偏移 1.25 倍，PC 宽屏上表现为明显的「没居中」。
     scale: {
-      mode: Phaser.Scale.FIT,
-      autoCenter: Phaser.Scale.CENTER_BOTH,
+      mode: Phaser.Scale.NONE,
+      autoCenter: Phaser.Scale.NO_CENTER,
       width: LOGICAL_WIDTH * RENDER_SCALE,
       height: LOGICAL_HEIGHT * RENDER_SCALE,
     },

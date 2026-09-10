@@ -1,0 +1,1233 @@
+<!doctype html>
+<html lang="zh-CN">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+		<title>接睫乐 - 守护明亮双眼</title>
+		<!-- Tailwind CSS CDN -->
+		<script src="https://cdn.tailwindcss.com"></script>
+		<!-- FontAwesome Icons -->
+		<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+		<!-- Google Fonts -->
+		<link
+			href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&family=Noto+Sans+SC:wght@400;500;700;900&display=swap"
+			rel="stylesheet"
+		/>
+		<script>
+			tailwind.config = {
+				theme: {
+					extend: {
+						colors: {
+							brand: {
+								50: '#f0fdf4',
+								100: '#dcfce7',
+								400: '#4ade80',
+								500: '#22c55e',
+								600: '#16a34a',
+								700: '#15803d'
+							},
+							eyeSky: '#e0f2fe',
+							eyePrimary: '#0284c7',
+							dangerRed: '#ef4444',
+							warningYellow: '#f59e0b'
+						},
+						fontFamily: {
+							sans: ['Noto Sans SC', 'sans-serif'],
+							fun: ['Fredoka', 'Noto Sans SC', 'sans-serif']
+						}
+					}
+				}
+			};
+		</script>
+		<style>
+			body {
+				touch-action: manipulation;
+				user-select: none;
+				-webkit-user-select: none;
+				background: linear-gradient(135deg, #e0f2fe 0%, #f0fdf4 100%);
+				min-height: 100vh;
+			}
+			.glass-panel {
+				background: rgba(255, 255, 255, 0.85);
+				backdrop-filter: blur(12px);
+				-webkit-backdrop-filter: blur(12px);
+				border: 1px solid rgba(255, 255, 255, 0.6);
+			}
+			.btn-bounce:active {
+				transform: scale(0.95);
+			}
+			.custom-scrollbar::-webkit-scrollbar {
+				width: 6px;
+			}
+			.custom-scrollbar::-webkit-scrollbar-track {
+				background: rgba(0, 0, 0, 0.05);
+				border-radius: 8px;
+			}
+			.custom-scrollbar::-webkit-scrollbar-thumb {
+				background: rgba(34, 197, 94, 0.4);
+				border-radius: 8px;
+			}
+			canvas {
+				display: block;
+				touch-action: none;
+			}
+			@keyframes pulse-glow {
+				0%,
+				100% {
+					opacity: 0.8;
+					transform: scale(1);
+				}
+				50% {
+					opacity: 1;
+					transform: scale(1.05);
+				}
+			}
+			.pulse-animation {
+				animation: pulse-glow 2s infinite ease-in-out;
+			}
+		</style>
+	</head>
+	<body
+		class="flex flex-col justify-center items-center min-h-screen p-2 md:p-4 text-slate-800 font-sans overflow-x-hidden"
+	>
+		<!-- Game Container Card -->
+		<div
+			class="w-full max-w-md bg-white/90 shadow-2xl rounded-3xl overflow-hidden border-4 border-white/80 relative flex flex-col h-[90vh] max-h-[840px] min-h-[600px]"
+		>
+			<!-- Header Banner -->
+			<header
+				class="px-4 py-3 bg-gradient-to-r from-emerald-500 to-teal-600 text-white flex justify-between items-center shadow-md relative z-10"
+			>
+				<div class="flex items-center space-x-2">
+					<div
+						class="w-9 h-9 bg-white text-emerald-600 rounded-full flex items-center justify-center font-bold text-lg shadow-inner"
+					>
+						👀
+					</div>
+					<div>
+						<h1 class="font-fun font-bold text-lg leading-tight tracking-wider">接睫乐</h1>
+						<p class="text-[10px] text-emerald-100 font-medium">近视不可逆转 · 可防可控</p>
+					</div>
+				</div>
+				<div class="flex items-center space-x-2">
+					<button
+						id="btnSound"
+						class="w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center text-white transition btn-bounce"
+					>
+						<i class="fa-solid fa-volume-high text-xs"></i>
+					</button>
+					<button
+						id="btnInfo"
+						class="w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center text-white transition btn-bounce"
+					>
+						<i class="fa-solid fa-book-medical text-xs"></i>
+					</button>
+				</div>
+			</header>
+
+			<!-- Canvas and HUD Area -->
+			<div
+				class="relative flex-1 bg-gradient-to-b from-sky-100 via-emerald-50 to-amber-50 overflow-hidden flex flex-col"
+			>
+				<!-- HUD Bar -->
+				<div
+					id="hud"
+					class="absolute top-2 left-2 right-2 flex justify-between items-center z-10 px-3 py-1.5 glass-panel rounded-2xl shadow-sm text-xs font-bold"
+				>
+					<!-- Health Hearts -->
+					<div class="flex items-center space-x-1">
+						<span class="text-slate-500 mr-1 text-[11px]">生命:</span>
+						<div id="heartsContainer" class="flex space-x-0.5 text-red-500 text-sm">
+							<i class="fa-solid fa-heart"></i>
+							<i class="fa-solid fa-heart"></i>
+							<i class="fa-solid fa-heart"></i>
+							<i class="fa-solid fa-heart"></i>
+							<i class="fa-solid fa-heart"></i>
+						</div>
+					</div>
+					<!-- Score & Timer -->
+					<div class="flex space-x-3 items-center">
+						<div
+							class="bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full flex items-center gap-1 shadow-inner"
+						>
+							<i class="fa-solid fa-star text-amber-500 text-xs"></i>
+							<span id="scoreText" class="font-fun text-sm">0</span>
+						</div>
+						<div
+							class="bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full flex items-center gap-1 shadow-inner"
+						>
+							<i class="fa-solid fa-clock text-blue-500 text-xs"></i>
+							<span id="timerText" class="font-fun text-sm">45s</span>
+						</div>
+					</div>
+				</div>
+
+				<!-- Combo Popup Notification -->
+				<div
+					id="comboBanner"
+					class="absolute top-14 left-1/2 -translate-x-1/2 pointer-events-none opacity-0 transition-all duration-300 transform scale-75 z-10"
+				>
+					<div
+						class="bg-gradient-to-r from-amber-400 to-orange-500 text-white font-fun font-bold px-3 py-1 rounded-full text-xs shadow-lg flex items-center gap-1"
+					>
+						<i class="fa-solid fa-bolt"></i> <span id="comboText">连击 x3!</span>
+					</div>
+				</div>
+
+				<!-- Main Interactive Canvas -->
+				<canvas id="gameCanvas" class="w-full h-full flex-1 cursor-pointer"></canvas>
+
+				<!-- Touch Control Overlay Indicator for Mobile -->
+				<div
+					id="touchGuide"
+					class="absolute bottom-3 left-0 right-0 text-center pointer-events-none text-slate-400 text-xs opacity-70 animate-pulse"
+				>
+					<i class="fa-solid fa-arrows-left-right mr-1"></i>左右滑动移动角色
+				</div>
+			</div>
+
+			<!-- START SCREEN OVERLAY -->
+			<div
+				id="startScreen"
+				class="absolute inset-0 bg-gradient-to-b from-sky-400/95 via-teal-500/95 to-emerald-600/95 z-20 flex flex-col justify-between p-6 text-white text-center backdrop-blur-md"
+			>
+				<div class="mt-4">
+					<div
+						class="inline-block bg-white/20 backdrop-blur-md text-emerald-100 text-xs px-3.5 py-1 rounded-full mb-3 border border-white/30 font-medium"
+					>
+						全国爱眼日特献 · 科学护眼手游
+					</div>
+					<h2 class="font-fun text-4xl font-extrabold tracking-wider drop-shadow-md text-yellow-300">
+						《接睫乐》
+					</h2>
+					<p class="text-xs text-emerald-100 mt-1 font-medium">看谁能接住最强视力，避开眼健康大敌！</p>
+				</div>
+
+				<!-- Animated Mascot / Target Preview -->
+				<div class="my-auto py-4 flex flex-col items-center">
+					<div class="relative w-28 h-28 flex items-center justify-center">
+						<div class="absolute inset-0 bg-yellow-300/30 rounded-full blur-xl pulse-animation"></div>
+						<!-- Mascot Graphic -->
+						<div
+							class="w-24 h-24 bg-white rounded-3xl shadow-xl flex flex-col items-center justify-center border-4 border-yellow-300 relative z-10 transform rotate-3"
+						>
+							<div class="text-2xl -mt-2">🧢</div>
+							<div class="text-3xl">👀</div>
+							<div class="text-xs font-bold text-emerald-700 mt-1">目小明</div>
+						</div>
+					</div>
+
+					<!-- Game Rules Briefing -->
+					<div class="grid grid-cols-2 gap-2 mt-5 text-left w-full text-xs">
+						<div class="bg-white/15 p-2.5 rounded-xl border border-white/20 flex items-center gap-2">
+							<div class="text-xl">☀️</div>
+							<div>
+								<div class="font-bold text-yellow-200">接住益眼物</div>
+								<div class="text-[10px] text-white/80">阳光、蓝莓、远眺</div>
+							</div>
+						</div>
+						<div class="bg-white/15 p-2.5 rounded-xl border border-white/20 flex items-center gap-2">
+							<div class="text-xl">📱</div>
+							<div>
+								<div class="font-bold text-red-200">避开危害物</div>
+								<div class="text-[10px] text-white/80">电子屏、高糖、关灯看</div>
+							</div>
+						</div>
+					</div>
+				</div>
+
+				<!-- Start Game Button -->
+				<div class="mb-4 space-y-2">
+					<button
+						id="btnStart"
+						class="w-full py-3.5 bg-gradient-to-r from-amber-400 to-orange-500 hover:from-amber-300 hover:to-orange-400 text-white font-fun text-xl font-extrabold rounded-2xl shadow-lg border-2 border-yellow-200 transform btn-bounce transition flex items-center justify-center gap-2"
+					>
+						<i class="fa-solid fa-play"></i> 开始接睫体验
+					</button>
+					<div class="text-[11px] text-white/70">初始化获得 5 点生命值 · 限制 45 秒挑战</div>
+				</div>
+			</div>
+
+			<!-- REPORT & GAME OVER OVERLAY -->
+			<div
+				id="reportScreen"
+				class="absolute inset-0 bg-slate-900/80 backdrop-blur-md z-30 hidden flex flex-col justify-end transition-opacity duration-300"
+			>
+				<div
+					class="bg-white rounded-t-3xl p-5 w-full max-h-[92%] flex flex-col justify-between shadow-2xl overflow-hidden animate-slide-up"
+				>
+					<!-- Modal Title -->
+					<div class="text-center pb-3 border-b border-slate-100 relative">
+						<div
+							class="inline-block bg-emerald-100 text-emerald-800 text-[11px] font-bold px-3 py-0.5 rounded-full mb-1"
+						>
+							个人定制诊断
+						</div>
+						<h3 class="text-xl font-bold text-slate-800 font-fun">近视风险指数报告</h3>
+						<p class="text-xs text-slate-400">基于您的游戏防护反应及危害物品避让表现生成</p>
+					</div>
+
+					<!-- Scrollable Content Container -->
+					<div class="overflow-y-auto custom-scrollbar my-3 space-y-4 pr-1">
+						<!-- Score & Risk Index Gauge -->
+						<div
+							class="bg-gradient-to-br from-slate-50 to-blue-50/50 p-4 rounded-2xl border border-slate-100 flex items-center justify-between"
+						>
+							<div>
+								<div class="text-xs text-slate-500 font-medium">综合护眼得分</div>
+								<div id="reportScore" class="font-fun text-3xl font-extrabold text-emerald-600">0</div>
+								<div class="text-[11px] text-slate-400 mt-0.5">
+									捕获益眼品:
+									<span id="reportCaughtGood" class="text-emerald-600 font-bold">0</span> |
+									误触危害品: <span id="reportCaughtBad" class="text-red-500 font-bold">0</span>
+								</div>
+							</div>
+
+							<!-- Risk Rating Badge -->
+							<div class="text-center bg-white p-3 rounded-xl shadow-sm border border-slate-100">
+								<div class="text-[10px] text-slate-400 font-bold">近视发生/加重风险</div>
+								<div id="reportRiskBadge" class="font-bold text-lg text-emerald-500 mt-0.5">低风险</div>
+								<div
+									id="reportRiskSub"
+									class="text-[10px] text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full mt-1"
+								>
+									眼健康守护达人
+								</div>
+							</div>
+						</div>
+
+						<!-- Key Findings & Custom Suggestions -->
+						<div>
+							<h4
+								class="text-xs font-bold text-slate-700 uppercase tracking-wider mb-2 flex items-center gap-1.5"
+							>
+								<i class="fa-solid fa-stethoscope text-emerald-500"></i> 眼健康行为诊断
+							</h4>
+							<div id="reportDiagnosisList" class="space-y-2 text-xs">
+								<!-- Injected dynamically -->
+							</div>
+						</div>
+
+						<!-- Golden Core Education Card -->
+						<div
+							class="bg-gradient-to-r from-amber-500/10 to-orange-500/10 p-3 rounded-xl border border-amber-500/20"
+						>
+							<div class="flex gap-2 items-start">
+								<div class="text-amber-500 text-base mt-0.5"><i class="fa-solid fa-lightbulb"></i></div>
+								<div>
+									<div class="font-bold text-xs text-amber-900">核心知识：近视不可逆转！</div>
+									<div class="text-[11px] text-amber-800/90 mt-0.5 leading-relaxed">
+										眼轴变长如“气球吹大”无法恢复。防控关键在于：<strong class="text-amber-900"
+											>每天保证2小时户外阳光照射</strong
+										>，控制电子产品单次使用不超20分钟，并保持正确坐姿。
+									</div>
+								</div>
+							</div>
+						</div>
+					</div>
+
+					<!-- Action Buttons -->
+					<div class="pt-2 border-t border-slate-100 flex gap-2">
+						<button
+							id="btnRestart"
+							class="flex-1 py-3 bg-emerald-500 hover:bg-emerald-600 text-white font-fun font-bold text-sm rounded-xl shadow-md btn-bounce transition flex items-center justify-center gap-2"
+						>
+							<i class="fa-solid fa-rotate-right"></i> 再次挑战
+						</button>
+						<button
+							id="btnShare"
+							class="px-4 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-fun font-bold text-sm rounded-xl transition btn-bounce"
+						>
+							<i class="fa-solid fa-share-nodes"></i>
+						</button>
+					</div>
+				</div>
+			</div>
+
+			<!-- EYE CARE ENCYCLOPEDIA MODAL -->
+			<div
+				id="infoModal"
+				class="absolute inset-0 bg-slate-900/70 backdrop-blur-sm z-40 hidden flex items-center justify-center p-4"
+			>
+				<div
+					class="bg-white rounded-3xl p-5 w-full max-w-sm max-h-[85%] flex flex-col justify-between shadow-2xl animate-fade-in"
+				>
+					<div class="flex justify-between items-center pb-2 border-b border-slate-100">
+						<h3 class="font-bold text-slate-800 flex items-center gap-2 text-base">
+							<i class="fa-solid fa-book-open-reader text-emerald-500"></i> 接睫物品防范指南
+						</h3>
+						<button
+							id="btnCloseInfo"
+							class="text-slate-400 hover:text-slate-600 w-7 h-7 rounded-full flex items-center justify-center"
+						>
+							<i class="fa-solid fa-xmark"></i>
+						</button>
+					</div>
+
+					<div class="overflow-y-auto custom-scrollbar my-3 space-y-3 text-xs pr-1">
+						<div class="font-bold text-emerald-700 bg-emerald-50 p-2 rounded-lg">
+							✅ 必接物品（益眼健康）
+						</div>
+						<ul class="space-y-2 text-slate-600">
+							<li class="flex items-start gap-2">
+								<span class="text-base">☀️</span>
+								<div>
+									<strong class="text-slate-800">户外阳光：</strong>
+									刺激视网膜释放多巴胺，有效抑眼轴增长。
+								</div>
+							</li>
+							<li class="flex items-start gap-2">
+								<span class="text-base">🫐</span>
+								<div>
+									<strong class="text-slate-800">新鲜蓝莓/胡萝卜：</strong>
+									富含花青素与胡萝卜素，改善微循环。
+								</div>
+							</li>
+							<li class="flex items-start gap-2">
+								<span class="text-base">🏔️</span>
+								<div>
+									<strong class="text-slate-800">远眺绿植：</strong> 放松睫状肌，缓解近距离用眼疲劳。
+								</div>
+							</li>
+							<li class="flex items-start gap-2">
+								<span class="text-base">⏰</span>
+								<div>
+									<strong class="text-slate-800">20-20-20法则：</strong>
+									近距离用眼20分钟，远眺20英尺外20秒。
+								</div>
+							</li>
+						</ul>
+
+						<div class="font-bold text-red-700 bg-red-50 p-2 rounded-lg mt-3">❌ 避开物品（危害视力）</div>
+						<ul class="space-y-2 text-slate-600">
+							<li class="flex items-start gap-2">
+								<span class="text-base">📱</span>
+								<div>
+									<strong class="text-slate-800">沉迷视屏电子产品：</strong>
+									短波蓝光与频闪加剧视疲劳。
+								</div>
+							</li>
+							<li class="flex items-start gap-2">
+								<span class="text-base">🍰</span>
+								<div>
+									<strong class="text-slate-800">高糖甜食：</strong>
+									消耗体内钙质，降低巩膜壁弹性，易致眼轴拉长。
+								</div>
+							</li>
+							<li class="flex items-start gap-2">
+								<span class="text-base">🌙</span>
+								<div>
+									<strong class="text-slate-800">关灯看书/玩手机：</strong>
+									瞳孔放大，对比度剧剧变化致严重肌痉挛。
+								</div>
+							</li>
+							<li class="flex items-start gap-2">
+								<span class="text-base">✊</span>
+								<div>
+									<strong class="text-slate-800">频繁脏手揉眼：</strong>
+									容易引发结膜炎、散光及角膜变形。
+								</div>
+							</li>
+						</ul>
+					</div>
+
+					<button
+						id="btnUnderstand"
+						class="w-full py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white font-bold rounded-xl text-xs transition"
+					>
+						我已掌握护眼秘籍
+					</button>
+				</div>
+			</div>
+		</div>
+
+		<script>
+			/**
+			 * Web Audio Synthesizer for self-contained sound effects without external MP3 asset dependency.
+			 */
+			class SoundEngine {
+				constructor() {
+					this.ctx = null;
+					this.enabled = true;
+				}
+
+				init() {
+					if (!this.ctx) {
+						const AudioContext = window.AudioContext || window.webkitAudioContext;
+						this.ctx = new AudioContext();
+					}
+				}
+
+				playCatchGood() {
+					if (!this.enabled) return;
+					this.init();
+					const now = this.ctx.currentTime;
+					const osc = this.ctx.createOscillator();
+					const gain = this.ctx.createGain();
+
+					osc.type = 'sine';
+					osc.frequency.setValueAtTime(523.25, now); // C5
+					osc.frequency.exponentialRampToValueAtTime(880, now + 0.15); // A5
+
+					gain.gain.setValueAtTime(0.2, now);
+					gain.gain.exponentialRampToValueAtTime(0.01, now + 0.15);
+
+					osc.connect(gain);
+					gain.connect(this.ctx.destination);
+
+					osc.start(now);
+					osc.stop(now + 0.15);
+				}
+
+				playCatchBad() {
+					if (!this.enabled) return;
+					this.init();
+					const now = this.ctx.currentTime;
+					const osc = this.ctx.createOscillator();
+					const gain = this.ctx.createGain();
+
+					osc.type = 'sawtooth';
+					osc.frequency.setValueAtTime(220, now);
+					osc.frequency.exponentialRampToValueAtTime(110, now + 0.2);
+
+					gain.gain.setValueAtTime(0.3, now);
+					gain.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
+
+					osc.connect(gain);
+					gain.connect(this.ctx.destination);
+
+					osc.start(now);
+					osc.stop(now + 0.2);
+				}
+
+				playGameOver() {
+					if (!this.enabled) return;
+					this.init();
+					const now = this.ctx.currentTime;
+					const osc = this.ctx.createOscillator();
+					const gain = this.ctx.createGain();
+
+					osc.type = 'triangle';
+					osc.frequency.setValueAtTime(400, now);
+					osc.frequency.setValueAtTime(300, now + 0.15);
+					osc.frequency.setValueAtTime(200, now + 0.3);
+
+					gain.gain.setValueAtTime(0.3, now);
+					gain.gain.exponentialRampToValueAtTime(0.01, now + 0.5);
+
+					osc.connect(gain);
+					gain.connect(this.ctx.destination);
+
+					osc.start(now);
+					osc.stop(now + 0.5);
+				}
+			}
+
+			const ITEM_TYPES = [
+				// GOOD ITEMS
+				{
+					id: 'sun',
+					icon: '☀️',
+					name: '户外阳光',
+					type: 'good',
+					score: 100,
+					tip: '晒太阳可促多巴胺分泌，有效抑制眼轴变长！'
+				},
+				{
+					id: 'blueberry',
+					icon: '🫐',
+					name: '蓝莓花青素',
+					type: 'good',
+					score: 80,
+					tip: '花青素能促进视网膜紫质再生成，抗氧化！'
+				},
+				{
+					id: 'sports',
+					icon: '⚽',
+					name: '户外运动',
+					type: 'good',
+					score: 90,
+					tip: '运动使睫状肌放松，远近调节能力增强！'
+				},
+				{
+					id: 'carrot',
+					icon: '🥕',
+					name: '胡萝卜',
+					type: 'good',
+					score: 70,
+					tip: '丰富维生素A，维持角膜正常生理功能！'
+				},
+				{
+					id: 'distant',
+					icon: '🏔️',
+					name: '远眺绿植',
+					type: 'good',
+					score: 100,
+					tip: '远眺5米以外物体，是缓解眼疲劳最快有效的方法！'
+				},
+				{
+					id: 'rule20',
+					icon: '⏰',
+					name: '20-20-20法则',
+					type: 'good',
+					score: 120,
+					tip: '用眼20分钟，抬头远眺20英尺(6米)外20秒！'
+				},
+
+				// BAD ITEMS
+				{
+					id: 'phone',
+					icon: '📱',
+					name: '沉迷手机',
+					type: 'bad',
+					damage: 1,
+					tip: '长时间近距离盯着屏幕，是青少年近视首要元凶！'
+				},
+				{
+					id: 'game',
+					icon: '💻',
+					name: '熬夜玩电脑',
+					type: 'bad',
+					damage: 1,
+					tip: '夜间高能蓝光刺激，引发严重的视疲劳与干眼症！'
+				},
+				{
+					id: 'dark_read',
+					icon: '🌙',
+					name: '关灯看书',
+					type: 'bad',
+					damage: 1,
+					tip: '昏暗光线下对比度急剧变化，睫状肌极度痉挛！'
+				},
+				{
+					id: 'sweets',
+					icon: '🍰',
+					name: '高糖甜食',
+					type: 'bad',
+					damage: 1,
+					tip: '过量糖分消耗血钙，降低巩膜张力，眼轴易变长！'
+				},
+				{
+					id: 'rub',
+					icon: '✊',
+					name: '脏手揉眼',
+					type: 'bad',
+					damage: 1,
+					tip: '手部细菌易致眼部感染，且机械压迫增加散光风险！'
+				},
+				{
+					id: 'close_tv',
+					icon: '📺',
+					name: '凑近看电视',
+					type: 'bad',
+					damage: 1,
+					tip: '看电视距离应保持屏幕对角线的3-5倍以上！'
+				}
+			];
+
+			const canvas = document.getElementById('gameCanvas');
+			const ctx = canvas.getContext('2d');
+			const audio = new SoundEngine();
+
+			// Game State Variables
+			let gameState = 'START'; // START, PLAYING, GAMEOVER
+			let score = 0;
+			let lives = 5;
+			let timeLeft = 45;
+			let combo = 0;
+			let lastTime = 0;
+			let timerInterval = null;
+			let itemSpawnTimer = 0;
+			let itemSpawnInterval = 750; // ms between falling items
+
+			// Stat Tracking for Report
+			let stats = {
+				caughtGood: 0,
+				caughtBad: 0,
+				missedGood: 0,
+				caughtBadList: new Set()
+			};
+
+			// Player / Character Container
+			const player = {
+				x: 0,
+				y: 0,
+				width: 90,
+				height: 90,
+				trayYOffset: 12,
+				targetX: 0,
+				speed: 0.18
+			};
+
+			let fallingItems = [];
+			let particles = [];
+			let floatingTexts = [];
+
+			function resizeCanvas() {
+				const rect = canvas.parentElement.getBoundingClientRect();
+				canvas.width = rect.width;
+				canvas.height = rect.height;
+
+				player.y = canvas.height - player.height - 15;
+				if (gameState === 'START') {
+					player.x = canvas.width / 2 - player.width / 2;
+					player.targetX = player.x;
+				}
+			}
+			window.addEventListener('resize', resizeCanvas);
+
+			// Input Handling: Touch & Pointer Move
+			function handlePointerMove(clientX) {
+				const rect = canvas.getBoundingClientRect();
+				const mouseX = clientX - rect.left;
+				player.targetX = Math.max(0, Math.min(canvas.width - player.width, mouseX - player.width / 2));
+			}
+
+			canvas.addEventListener('mousemove', (e) => handlePointerMove(e.clientX));
+			canvas.addEventListener(
+				'touchmove',
+				(e) => {
+					if (e.touches.length > 0) {
+						handlePointerMove(e.touches[0].clientX);
+					}
+					e.preventDefault();
+				},
+				{ passive: false }
+			);
+
+			// Keyboard Arrow Keys
+			window.addEventListener('keydown', (e) => {
+				if (gameState !== 'PLAYING') return;
+				const step = 35;
+				if (e.key === 'ArrowLeft' || e.key === 'a') {
+					player.targetX = Math.max(0, player.x - step);
+				} else if (e.key === 'ArrowRight' || e.key === 'd') {
+					player.targetX = Math.min(canvas.width - player.width, player.x + step);
+				}
+			});
+
+			function spawnItem() {
+				// Randomly choose good or bad based on balance
+				const isGood = Math.random() < 0.55;
+				const pool = ITEM_TYPES.filter((item) => (isGood ? item.type === 'good' : item.type === 'bad'));
+				const template = pool[Math.floor(Math.random() * pool.length)];
+
+				const radius = 22;
+				const x = Math.random() * (canvas.width - radius * 2) + radius;
+				const speed = 2.2 + Math.random() * 1.8 + (45 - timeLeft) * 0.05;
+
+				fallingItems.push({
+					...template,
+					x: x,
+					y: -radius * 2,
+					radius: radius,
+					speed: speed,
+					rotation: Math.random() * Math.PI * 2,
+					rotSpeed: (Math.random() - 0.5) * 0.05
+				});
+			}
+
+			function createParticles(x, y, color, count = 12) {
+				for (let i = 0; i < count; i++) {
+					const angle = Math.random() * Math.PI * 2;
+					const speed = Math.random() * 4 + 1;
+					particles.push({
+						x: x,
+						y: y,
+						vx: Math.cos(angle) * speed,
+						vy: Math.sin(angle) * speed,
+						radius: Math.random() * 3 + 2,
+						color: color,
+						alpha: 1,
+						life: 1
+					});
+				}
+			}
+
+			function addFloatingText(text, x, y, color) {
+				floatingTexts.push({
+					text: text,
+					x: x,
+					y: y,
+					color: color,
+					alpha: 1,
+					vy: -1.5
+				});
+			}
+
+			function drawPlayer() {
+				// Smoothly lerp towards target position
+				player.x += (player.targetX - player.x) * player.speed;
+
+				ctx.save();
+				ctx.translate(player.x, player.y);
+
+				// 1. Draw Catching Tray / Basket on Top of Head
+				const trayY = player.trayYOffset;
+				ctx.fillStyle = '#0284c7'; // Vibrant Blue Basket
+				ctx.beginPath();
+				ctx.roundRect(5, trayY, player.width - 10, 14, 7);
+				ctx.fill();
+
+				// Basket Rim Highlight
+				ctx.fillStyle = '#38bdf8';
+				ctx.fillRect(8, trayY + 2, player.width - 16, 3);
+
+				// Basket Mesh Pattern
+				ctx.strokeStyle = '#0369a1';
+				ctx.lineWidth = 1.5;
+				ctx.beginPath();
+				ctx.moveTo(15, trayY + 14);
+				ctx.lineTo(player.width - 15, trayY + 14);
+				ctx.stroke();
+
+				// 2. Head Support / Stem
+				ctx.fillStyle = '#fde047';
+				ctx.fillRect(player.width / 2 - 4, trayY + 14, 8, 10);
+
+				// 3. Cute IP Character Face ("目小明")
+				const headY = trayY + 22;
+				const headHeight = 52;
+
+				// Head Base
+				ctx.fillStyle = '#ffffff';
+				ctx.shadowColor = 'rgba(0, 0, 0, 0.1)';
+				ctx.shadowBlur = 8;
+				ctx.beginPath();
+				ctx.roundRect(10, headY, player.width - 20, headHeight, 18);
+				ctx.fill();
+				ctx.shadowBlur = 0;
+
+				// Character Cheeks
+				ctx.fillStyle = '#fca5a5';
+				ctx.beginPath();
+				ctx.arc(22, headY + 30, 5, 0, Math.PI * 2);
+				ctx.arc(player.width - 22, headY + 30, 5, 0, Math.PI * 2);
+				ctx.fill();
+
+				// Character Eyes (Bright & Cute)
+				ctx.fillStyle = '#0f172a';
+				if (lives <= 2) {
+					// Worried / Dizzy Eyes when low life
+					ctx.font = '12px sans-serif';
+					ctx.fillText('🌀', 22, headY + 26);
+					ctx.fillText('🌀', player.width - 34, headY + 26);
+				} else {
+					ctx.beginPath();
+					ctx.arc(28, headY + 24, 5, 0, Math.PI * 2);
+					ctx.arc(player.width - 28, headY + 24, 5, 0, Math.PI * 2);
+					ctx.fill();
+					// Eye Reflection Sparkles
+					ctx.fillStyle = '#ffffff';
+					ctx.beginPath();
+					ctx.arc(26, headY + 22, 1.8, 0, Math.PI * 2);
+					ctx.arc(player.width - 30, headY + 22, 1.8, 0, Math.PI * 2);
+					ctx.fill();
+				}
+
+				// Smile Mouth
+				ctx.strokeStyle = '#0f172a';
+				ctx.lineWidth = 2.5;
+				ctx.lineCap = 'round';
+				ctx.beginPath();
+				if (lives <= 2) {
+					// Sad mouth
+					ctx.arc(player.width / 2, headY + 40, 6, Math.PI, 0);
+				} else {
+					// Happy smile
+					ctx.arc(player.width / 2, headY + 30, 7, 0.2, Math.PI - 0.2);
+				}
+				ctx.stroke();
+
+				ctx.restore();
+			}
+
+			function updateGame(timestamp) {
+				if (!lastTime) lastTime = timestamp;
+				const deltaTime = timestamp - lastTime;
+				lastTime = timestamp;
+
+				if (gameState === 'PLAYING') {
+					// Spawn Items Periodic Logic
+					itemSpawnTimer += deltaTime;
+					if (itemSpawnTimer > itemSpawnInterval) {
+						spawnItem();
+						itemSpawnTimer = 0;
+						// Slightly increase difficulty over time
+						itemSpawnInterval = Math.max(450, 750 - (45 - timeLeft) * 6);
+					}
+
+					// Update Falling Items
+					for (let i = fallingItems.length - 1; i >= 0; i--) {
+						const item = fallingItems[i];
+						item.y += item.speed;
+						item.rotation += item.rotSpeed;
+
+						// Collision Detection with Player Tray
+						const trayTop = player.y + player.trayYOffset;
+						const trayLeft = player.x + 5;
+						const trayRight = player.x + player.width - 5;
+
+						if (
+							item.y + item.radius >= trayTop &&
+							item.y - item.radius <= trayTop + 14 &&
+							item.x >= trayLeft &&
+							item.x <= trayRight
+						) {
+							// CATCH HIT!
+							if (item.type === 'good') {
+								combo++;
+								const points = item.score + (combo > 1 ? combo * 10 : 0);
+								score += points;
+								stats.caughtGood++;
+
+								audio.playCatchGood();
+								createParticles(item.x, item.y, '#22c55e', 14);
+								addFloatingText(`+${points} ${item.name}!`, item.x, item.y, '#16a34a');
+
+								if (combo >= 3) {
+									showComboBanner(combo);
+								}
+							} else {
+								// Hit Bad Item!
+								combo = 0;
+								lives -= item.damage;
+								stats.caughtBad++;
+								stats.caughtBadList.add(item.name);
+
+								audio.playCatchBad();
+								createParticles(item.x, item.y, '#ef4444', 18);
+								addFloatingText(`-1 ❤ ${item.name}!`, item.x, item.y, '#dc2626');
+
+								updateHeartsUI();
+
+								if (lives <= 0) {
+									// debug
+									// triggerGameOver();
+								}
+							}
+
+							fallingItems.splice(i, 1);
+							updateHUDText();
+							continue;
+						}
+
+						// Bottom Screen Miss Check
+						if (item.y - item.radius > canvas.height) {
+							if (item.type === 'good') {
+								stats.missedGood++;
+								combo = 0; // Break combo on missing good item
+							}
+							fallingItems.splice(i, 1);
+						}
+					}
+
+					// Update Particles
+					for (let i = particles.length - 1; i >= 0; i--) {
+						const p = particles[i];
+						p.x += p.vx;
+						p.y += p.vy;
+						p.alpha -= 0.03;
+						if (p.alpha <= 0) {
+							particles.splice(i, 1);
+						}
+					}
+
+					// Update Floating Texts
+					for (let i = floatingTexts.length - 1; i >= 0; i--) {
+						const ft = floatingTexts[i];
+						ft.y += ft.vy;
+						ft.alpha -= 0.02;
+						if (ft.alpha <= 0) {
+							floatingTexts.splice(i, 1);
+						}
+					}
+				}
+
+				// Render Loop
+				renderCanvas();
+
+				requestAnimationFrame(updateGame);
+			}
+
+			function renderCanvas() {
+				ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+				// Draw Background Subtle Pattern Grid
+				ctx.strokeStyle = 'rgba(2, 132, 199, 0.05)';
+				ctx.lineWidth = 1;
+				const gridSize = 40;
+				for (let x = 0; x < canvas.width; x += gridSize) {
+					ctx.beginPath();
+					ctx.moveTo(x, 0);
+					ctx.lineTo(x, canvas.height);
+					ctx.stroke();
+				}
+
+				// Draw Falling Items
+				for (const item of fallingItems) {
+					ctx.save();
+					ctx.translate(item.x, item.y);
+					ctx.rotate(item.rotation);
+
+					// Background Circle Badge
+					ctx.fillStyle = item.type === 'good' ? '#dcfce7' : '#fee2e2';
+					ctx.strokeStyle = item.type === 'good' ? '#86efac' : '#fca5a5';
+					ctx.lineWidth = 2;
+					ctx.beginPath();
+					ctx.arc(0, 0, item.radius, 0, Math.PI * 2);
+					ctx.fill();
+					ctx.stroke();
+
+					// Emoji Icon
+					ctx.font = '22px serif';
+					ctx.textAlign = 'center';
+					ctx.textBaseline = 'middle';
+					ctx.fillText(item.icon, 0, 1);
+
+					ctx.restore();
+				}
+
+				// Draw Player Character
+				drawPlayer();
+
+				// Draw Particle FX
+				for (const p of particles) {
+					ctx.save();
+					ctx.globalAlpha = Math.max(0, p.alpha);
+					ctx.fillStyle = p.color;
+					ctx.beginPath();
+					ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+					ctx.fill();
+					ctx.restore();
+				}
+
+				// Draw Floating Text Popups
+				for (const ft of floatingTexts) {
+					ctx.save();
+					ctx.globalAlpha = Math.max(0, ft.alpha);
+					ctx.fillStyle = ft.color;
+					ctx.font = 'bold 13px "Fredoka", "Noto Sans SC", sans-serif';
+					ctx.textAlign = 'center';
+					ctx.fillText(ft.text, ft.x, ft.y);
+					ctx.restore();
+				}
+			}
+
+			function updateHUDText() {
+				document.getElementById('scoreText').innerText = score;
+				document.getElementById('timerText').innerText = `${timeLeft}s`;
+			}
+
+			function updateHeartsUI() {
+				const container = document.getElementById('heartsContainer');
+				container.innerHTML = '';
+				for (let i = 0; i < 5; i++) {
+					if (i < lives) {
+						container.innerHTML +=
+							'<i class="fa-solid fa-heart transition-transform transform scale-110"></i>';
+					} else {
+						container.innerHTML += '<i class="fa-regular fa-heart text-slate-300"></i>';
+					}
+				}
+			}
+
+			function showComboBanner(count) {
+				const banner = document.getElementById('comboBanner');
+				document.getElementById('comboText').innerText = `连续避险连击 x${count}!`;
+				banner.classList.remove('opacity-0', 'scale-75');
+				banner.classList.add('opacity-100', 'scale-100');
+
+				setTimeout(() => {
+					banner.classList.remove('opacity-100', 'scale-100');
+					banner.classList.add('opacity-0', 'scale-75');
+				}, 1200);
+			}
+
+			function startGame() {
+				score = 0;
+				lives = 5;
+				timeLeft = 45;
+				combo = 0;
+				fallingItems = [];
+				particles = [];
+				floatingTexts = [];
+
+				stats = {
+					caughtGood: 0,
+					caughtBad: 0,
+					missedGood: 0,
+					caughtBadList: new Set()
+				};
+
+				updateHUDText();
+				updateHeartsUI();
+
+				document.getElementById('startScreen').classList.add('hidden');
+				document.getElementById('reportScreen').classList.add('hidden');
+
+				gameState = 'PLAYING';
+
+				if (timerInterval) clearInterval(timerInterval);
+				timerInterval = setInterval(() => {
+					if (gameState === 'PLAYING') {
+						timeLeft--;
+						updateHUDText();
+
+						if (timeLeft <= 0) {
+							// debug
+							// triggerGameOver();
+						}
+					}
+				}, 1000);
+			}
+
+			function triggerGameOver() {
+				gameState = 'GAMEOVER';
+				if (timerInterval) clearInterval(timerInterval);
+
+				audio.playGameOver();
+				generateMyopiaReport();
+
+				document.getElementById('reportScreen').classList.remove('hidden');
+			}
+
+			function generateMyopiaReport() {
+				document.getElementById('reportScore').innerText = score;
+				document.getElementById('reportCaughtGood').innerText = stats.caughtGood;
+				document.getElementById('reportCaughtBad').innerText = stats.caughtBad;
+
+				const badge = document.getElementById('reportRiskBadge');
+				const sub = document.getElementById('reportRiskSub');
+				const list = document.getElementById('reportDiagnosisList');
+
+				list.innerHTML = '';
+
+				// Calculate Risk Assessment
+				let riskLevel = 'LOW';
+				if (stats.caughtBad >= 3 || lives <= 1) {
+					riskLevel = 'HIGH';
+				} else if (stats.caughtBad >= 1 || score < 400) {
+					riskLevel = 'MODERATE';
+				}
+
+				if (riskLevel === 'LOW') {
+					badge.innerText = '低风险 🟢';
+					badge.className = 'font-bold text-lg text-emerald-600 mt-0.5';
+					sub.innerText = '护眼习惯非常出色！';
+					sub.className =
+						'text-[10px] text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full mt-1 font-bold';
+				} else if (riskLevel === 'MODERATE') {
+					badge.innerText = '中等风险 🟡';
+					badge.className = 'font-bold text-lg text-amber-500 mt-0.5';
+					sub.innerText = '需注意避开视力隐患';
+					sub.className = 'text-[10px] text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full mt-1 font-bold';
+				} else {
+					badge.innerText = '高风险 🔴';
+					badge.className = 'font-bold text-lg text-red-500 mt-0.5';
+					sub.innerText = '视力警报！急需改正用眼';
+					sub.className = 'text-[10px] text-red-700 bg-red-50 px-2 py-0.5 rounded-full mt-1 font-bold';
+				}
+
+				// Dynamic Personalized Recommendations
+				const diagnosisItems = [];
+
+				if (stats.caughtBadList.has('沉迷手机') || stats.caughtBadList.has('熬夜玩电脑')) {
+					diagnosisItems.push({
+						icon: '📱',
+						title: '电子屏幕过度依赖',
+						desc: '检测到误触电子产品！建议单次观看屏幕不超过20分钟，每天累计不宜超1小时。'
+					});
+				}
+
+				if (stats.caughtBadList.has('高糖甜食')) {
+					diagnosisItems.push({
+						icon: '🍰',
+						title: '高糖饮食隐患',
+						desc: '摄入高糖会降低血钙浓度，削弱眼球巩膜壁的弹性，使眼轴更容易增长变长！'
+					});
+				}
+
+				if (stats.caughtBadList.has('关灯看书') || stats.caughtBadList.has('脏手揉眼')) {
+					diagnosisItems.push({
+						icon: '🌙',
+						title: '不良用眼习惯',
+						desc: '暗光用眼与手部揉眼极易引发眼肌痉挛及角膜感染，切忌在光线不足处阅读。'
+					});
+				}
+
+				if (stats.caughtGood >= 5) {
+					diagnosisItems.push({
+						icon: '☀️',
+						title: '阳光户外高手',
+						desc: '太棒了！您非常注重户外阳光与营养补充。日间户外活动2小时是防控近视第一利器。'
+					});
+				} else {
+					diagnosisItems.push({
+						icon: '🏔️',
+						title: '户外远眺不足',
+						desc: '游戏中漏接较多户外/远眺元素。请记住：看清远方是放松睫状肌的最佳自然处方。'
+					});
+				}
+
+				// Render Diagnosis Cards
+				diagnosisItems.forEach((item) => {
+					list.innerHTML += `
+                    <div class="bg-slate-50 p-2.5 rounded-xl border border-slate-100 flex items-start gap-2.5">
+                        <div class="text-xl shrink-0">${item.icon}</div>
+                        <div>
+                            <div class="font-bold text-slate-800 text-xs">${item.title}</div>
+                            <div class="text-[11px] text-slate-500 mt-0.5 leading-tight">${item.desc}</div>
+                        </div>
+                    </div>
+                `;
+				});
+			}
+
+			document.getElementById('btnStart').addEventListener('click', startGame);
+			document.getElementById('btnRestart').addEventListener('click', startGame);
+
+			// Sound Toggle Button
+			document.getElementById('btnSound').addEventListener('click', () => {
+				audio.enabled = !audio.enabled;
+				const icon = document.getElementById('btnSound').querySelector('i');
+				if (audio.enabled) {
+					icon.className = 'fa-solid fa-volume-high text-xs';
+				} else {
+					icon.className = 'fa-solid fa-volume-xmark text-xs';
+				}
+			});
+
+			// Lore Modal Controls
+			const infoModal = document.getElementById('infoModal');
+			document.getElementById('btnInfo').addEventListener('click', () => {
+				infoModal.classList.remove('hidden');
+			});
+			document.getElementById('btnCloseInfo').addEventListener('click', () => {
+				infoModal.classList.add('hidden');
+			});
+			document.getElementById('btnUnderstand').addEventListener('click', () => {
+				infoModal.classList.add('hidden');
+			});
+
+			// Share Button (Simulated Copying)
+			document.getElementById('btnShare').addEventListener('click', () => {
+				const shareText = `我在《接睫乐》近视防控游戏中获得了 ${score} 分！近视不可逆转，守护明亮双眼从今天开始！`;
+				const el = document.createElement('textarea');
+				el.value = shareText;
+				document.body.appendChild(el);
+				el.select();
+				document.execCommand('copy');
+				document.body.removeChild(el);
+
+				addFloatingText('已复制战绩，快去分享吧！', canvas.width / 2, canvas.height / 2, '#0284c7');
+			});
+
+			// Window Onload Initialization
+			window.onload = () => {
+				resizeCanvas();
+				requestAnimationFrame(updateGame);
+			};
+		</script>
+	</body>
+</html>
