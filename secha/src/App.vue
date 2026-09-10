@@ -8,13 +8,7 @@
 		</div>
 		<header class="stats">
 			<div class="stat">
-				<span class="label">关卡</span><span class="value">{{ level }}</span>
-			</div>
-			<div class="stat">
-				<span class="label">得分</span><span class="value">{{ score }}</span>
-			</div>
-			<div class="stat">
-				<span class="label">最佳</span><span class="value">{{ best }}</span>
+				<span class="label">关卡</span><span class="value">{{ level }} / {{ MAX_LEVEL }}</span>
 			</div>
 			<div class="stat">
 				<span class="label">灵敏度最佳</span><span class="value">{{ bestSens }}</span>
@@ -39,16 +33,14 @@
 
 		<div v-if="phase === 'over'" class="over-modal">
 			<div class="modal-card">
-				<h1 class="title over">游戏结束</h1>
+				<h1 class="title over">{{ cleared ? '🎉 全部通关' : '游戏结束' }}</h1>
+				<p class="win-text" v-if="cleared">
+					太厉害了！{{ MAX_LEVEL }} 关全部通过，色觉辨识能力拉满 🎊
+				</p>
 				<div class="result">
 					<div>
-						<span>本局得分</span><b>{{ score }}</b>
-					</div>
-					<div>
-						<span>到达关卡</span><b>{{ level }}</b>
-					</div>
-					<div>
-						<span>历史最佳</span><b>{{ best }}</b>
+						<span>{{ cleared ? '通关进度' : '到达关卡' }}</span>
+						<b>{{ cleared ? MAX_LEVEL + ' / ' + MAX_LEVEL : level }}</b>
 					</div>
 				</div>
 				<div class="sensitivity">
@@ -100,24 +92,11 @@ type Phase = 'ready' | 'playing' | 'over';
 
 const phase = ref<Phase>('ready');
 const level = ref(1);
-const score = ref(0);
 
-// 历史最佳（单值记录）
-function loadBest(): number {
-	try {
-		return Number(localStorage.getItem('color-diff-best') || 0) || 0;
-	} catch {
-		return 0;
-	}
-}
-function saveBest(v: number) {
-	try {
-		localStorage.setItem('color-diff-best', String(v));
-	} catch {
-		/* ignore */
-	}
-}
-const best = ref(loadBest());
+// 总关卡数：通过第 10 关即视为全部通关
+const MAX_LEVEL = 10;
+// 本局是否全部通关（用于结束页展示恭喜文案）
+const cleared = ref(false);
 
 // 结束页「再来一局」按钮是否可点击
 // 防止「点错方块→游戏结束」的同一手势穿透到刚出现的按钮
@@ -228,6 +207,10 @@ function sfxOver() {
 	tone(330, 0.18, 'sine');
 	setTimeout(() => tone(247, 0.32, 'sine'), 140);
 }
+function sfxWin() {
+	// 通关：上行琶音
+	[523, 659, 784, 1047].forEach((f, i) => setTimeout(() => tone(f, 0.18, 'triangle', 0.06), i * 110));
+}
 function buzz(pattern: number | number[]) {
 	if (!muted.value && typeof navigator.vibrate === 'function') navigator.vibrate(pattern);
 }
@@ -286,13 +269,13 @@ function sharePoster() {
 	g.fillStyle = 'rgba(255,255,255,0.6)';
 	g.fillText(ds, W / 2, 192);
 
-	// 大得分
+	// 大数字：色觉灵敏度分
 	g.fillStyle = '#ffd166';
 	g.font = 'bold 160px sans-serif';
-	g.fillText(String(score.value), W / 2, 380);
+	g.fillText(String(sensitivity.value), W / 2, 380);
 	g.fillStyle = '#ffffff';
 	g.font = '28px sans-serif';
-	g.fillText('本局得分', W / 2, 430);
+	g.fillText('色觉灵敏度', W / 2, 430);
 
 	// 灵敏度等级胶囊
 	g.fillStyle = 'rgba(255,126,179,0.18)';
@@ -300,12 +283,11 @@ function sharePoster() {
 	g.fill();
 	g.fillStyle = '#ff7eb3';
 	g.font = 'bold 34px sans-serif';
-	g.fillText(`色觉灵敏度 ${sensitivity.value} · ${sensGrade.value}`, W / 2, 516);
+	g.fillText(`色觉灵敏度 · ${sensGrade.value}`, W / 2, 516);
 
-	// 2x2 统计卡
+	// 统计卡
 	const stats: [string, string][] = [
-		['到达关卡', String(level.value)],
-		['历史最佳', String(best.value)],
+		[cleared.value ? '通关进度' : '到达关卡', cleared.value ? `${MAX_LEVEL} / ${MAX_LEVEL}` : String(level.value)],
 		['灵敏度最佳', String(bestSens.value)]
 	];
 	const bx = [60, 380];
@@ -501,7 +483,7 @@ function newLevel() {
 	state.clickedWrong = -1;
 	state.cell = (boardSize.value - GAP * (n + 1)) / n;
 	// 每关重置时限（难度曲线：关卡越高时间越紧）
-	timeMax.value = timeForLevel(level.value);
+	// timeMax.value = timeForLevel(level.value);
 	timeLeft.value = timeMax.value;
 	endTime = performance.now() + timeMax.value;
 	draw();
@@ -522,15 +504,15 @@ function gameOver() {
 	phase.value = 'over';
 	cancelAnimationFrame(rafId);
 	showKnowledge.value = true;
-	sfxOver();
-	buzz([60, 40, 60, 40, 60]);
-	// 历史最佳（单值记录）
-	if (score.value > best.value) {
-		best.value = score.value;
-		saveBest(best.value);
+	if (cleared.value) {
+		sfxWin();
+		buzz([30, 50, 30, 50, 120]);
+	} else {
+		sfxOver();
+		buzz([60, 40, 60, 40, 60]);
 	}
 	// 计算色觉灵敏度评分：成功闯过的关卡越多，能分辨的最小色差越小 → 评分越高
-	const peak = Math.max(0, level.value - 1); // 成功清掉的关卡数
+	const peak = cleared.value ? MAX_LEVEL : Math.max(0, level.value - 1); // 成功清掉的关卡数
 	const minDiff = diffForLevel(Math.max(1, peak)); // 最小可辨亮度差（HSL %）
 	minDiffPct.value = peak >= 1 ? Number(minDiff.toFixed(1)) : 0;
 	// const SENS_MAX = 16; // 色差降到下限(2.2%)所需闯过的关卡数
@@ -589,13 +571,19 @@ function handlePoint(e: PointerEvent) {
 		locked = true;
 		state.clickedWrong = -2; // 答对高亮
 		draw();
-		score.value += state.n * 5;
 		sfxCorrect();
 		buzz(15);
 		setTimeout(() => {
-			level.value += 1;
-			newLevel();
-			sfxLevel();
+			if (level.value >= MAX_LEVEL) {
+				// 通过第 MAX_LEVEL 关：全部通关，进入结算页恭喜
+				cleared.value = true;
+				gameOver();
+			} else {
+				// 硬钳制：关卡数永远不会超过 MAX_LEVEL
+				level.value = Math.min(level.value + 1, MAX_LEVEL);
+				newLevel();
+				sfxLevel();
+			}
 			locked = false;
 		}, 170);
 	} else {
@@ -619,8 +607,8 @@ function startGame() {
 	gameHue = rand(0, 360);
 	lastSat = -1;
 	level.value = 1;
-	score.value = 0;
 	locked = false;
+	cleared.value = false;
 	phase.value = 'playing';
 	calcBoard();
 	setupCanvas();
@@ -734,6 +722,15 @@ onBeforeUnmount(() => {
 }
 .title.over {
 	color: #ffd166;
+}
+/* 全部通关恭喜文案 */
+.win-text {
+	margin: -4px 0 2px;
+	font-size: 14px;
+	font-weight: 600;
+	line-height: 1.6;
+	text-align: center;
+	color: #9be7c4;
 }
 .sub {
 	font-size: 15px;
@@ -1000,6 +997,9 @@ onBeforeUnmount(() => {
 	}
 	.title.over {
 		font-size: 38px;
+	}
+	.win-text {
+		font-size: 15px;
 	}
 	.sub {
 		font-size: 17px;
