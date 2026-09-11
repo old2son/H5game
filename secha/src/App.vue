@@ -20,7 +20,13 @@
 		</div>
 
 		<div class="board" :style="{ width: boardSize + 'px', height: boardSize + 'px' }">
-			<canvas ref="canvasRef" class="canvas" @pointerdown="handlePoint"></canvas>
+			<canvas
+				ref="canvasRef"
+				class="canvas"
+				@pointerdown="handlePoint"
+				@pointermove="handlePointerMove"
+				@pointerleave="resetCanvasCursor"
+			></canvas>
 
 			<div v-if="phase === 'ready'" class="overlay">
 				<h1 class="title">色差挑战</h1>
@@ -28,15 +34,12 @@
 				<p class="tip">关卡越高 · 色差越小 · 速度要快</p>
 				<button class="btn" @click="startGame">开始游戏</button>
 			</div>
-
 		</div>
 
 		<div v-if="phase === 'over'" class="over-modal">
 			<div class="modal-card">
 				<h1 class="title over">{{ cleared ? '🎉 全部通关' : '游戏结束' }}</h1>
-				<p class="win-text" v-if="cleared">
-					太厉害了！{{ MAX_LEVEL }} 关全部通过，色觉辨识能力拉满 🎊
-				</p>
+				<p class="win-text" v-if="cleared">太厉害了！{{ MAX_LEVEL }} 关全部通过，色觉辨识能力拉满 🎊</p>
 				<div class="result">
 					<div>
 						<span>{{ cleared ? '通关进度' : '到达关卡' }}</span>
@@ -56,14 +59,15 @@
 						</div>
 					</div>
 				</div>
-			<p class="sens-desc">{{ sensDesc }}</p>
-			<div class="knowledge-wrap" v-if="showKnowledge && currentCard">
+				<p class="sens-desc">{{ sensDesc }}</p>
+				<div class="knowledge-wrap" v-if="showKnowledge && currentCard">
 					<div class="knowledge">
 						<div class="k-head">📘 色觉小课堂 · {{ currentCard.title }}</div>
 						<p class="k-body">{{ currentCard.body }}</p>
 						<ul class="k-list">
 							<li v-for="item in currentCard.list" :key="item.name">
-								<b>{{ item.name }}</b><span>{{ item.desc }}</span>
+								<b>{{ item.name }}</b
+								><span>{{ item.desc }}</span>
 							</li>
 						</ul>
 						<p class="k-extra" v-if="currentCard.extra">💡 {{ currentCard.extra }}</p>
@@ -73,11 +77,11 @@
 						<button class="link-btn" @click="showKnowledge = false">收起</button>
 					</div>
 				</div>
-			<button v-else class="link-btn" @click="showKnowledge = true">📘 查看色觉科普</button>
-			<div class="btn-row">
-				<button class="btn ghost" @click="sharePoster">📸 保存成绩卡</button>
-				<button class="btn" @click="onReplay">再来一局</button>
-			</div>
+				<button v-else class="link-btn" @click="showKnowledge = true">📘 查看色觉科普</button>
+				<div class="btn-row">
+					<button class="btn ghost" @click="sharePoster">📸 保存成绩卡</button>
+					<button class="btn" @click="onReplay">再来一局</button>
+				</div>
 			</div>
 		</div>
 
@@ -89,6 +93,7 @@
 import { ref, reactive, computed, onMounted, onBeforeUnmount } from 'vue';
 
 type Phase = 'ready' | 'playing' | 'over';
+type EndReason = 'wrong' | 'timeout' | 'cleared';
 
 const phase = ref<Phase>('ready');
 const level = ref(1);
@@ -101,6 +106,7 @@ const cleared = ref(false);
 // 结束页「再来一局」按钮是否可点击
 // 防止「点错方块→游戏结束」的同一手势穿透到刚出现的按钮
 const replayReady = ref(false);
+const endReason = ref<EndReason>('wrong');
 
 // 游戏结束后的色觉科普知识卡（每次随机抽一张）
 interface Knowledge {
@@ -125,8 +131,14 @@ const knowledgeCards: Knowledge[] = [
 		title: '色盲是怎么遗传的',
 		body: '决定红、绿色觉的基因位于 X 染色体上，呈 X 连锁隐性遗传；蓝色觉基因则在常染色体上。',
 		list: [
-			{ name: '男性更易患病', desc: '男性只有 1 条 X，基因异常即发病；女性需 2 条 X 都异常才发病，故男性发病率（约 8%）远高于女性（约 0.5%）。' },
-			{ name: '母传子', desc: '男性患者的致病 X 必来自母亲，且一定传给全部女儿（女儿多为携带者），不会传给儿子。' },
+			{
+				name: '男性更易患病',
+				desc: '男性只有 1 条 X，基因异常即发病；女性需 2 条 X 都异常才发病，故男性发病率（约 8%）远高于女性（约 0.5%）。'
+			},
+			{
+				name: '母传子',
+				desc: '男性患者的致病 X 必来自母亲，且一定传给全部女儿（女儿多为携带者），不会传给儿子。'
+			},
 			{ name: '携带者女儿', desc: '女性携带者本人多正常，但所生儿子有 50% 概率患病。' },
 			{ name: '蓝黄色盲', desc: '为常染色体显性遗传，男女患病机会均等。' }
 		],
@@ -344,6 +356,9 @@ let endTime = 0;
 let locked = false;
 let gameHue = 0; // 本局（一局游戏）固定色相，重开一局才换
 let lastSat = -1; // 上一关饱和度，用于保证每一关饱和度不同
+let blinkTimer = 0;
+let targetBlinkVisible = true;
+let targetBlinkActive = false;
 
 // 当前关卡数据
 const state = reactive({
@@ -427,6 +442,59 @@ function colorFor(i: number): string {
 	return `hsl(${state.baseH}, ${state.baseS}%, ${l}%)`;
 }
 
+function setCanvasCursor(cursor: 'default' | 'pointer') {
+	if (canvasRef.value) canvasRef.value.style.cursor = cursor;
+}
+
+function resetCanvasCursor() {
+	setCanvasCursor('default');
+}
+
+function getCellIndexAtPoint(x: number, y: number) {
+	const n = state.n;
+	const cell = state.cell;
+	const col = Math.floor((x - GAP) / (cell + GAP));
+	const row = Math.floor((y - GAP) / (cell + GAP));
+	if (col < 0 || col >= n || row < 0 || row >= n) return -1;
+	const cx = GAP + col * (cell + GAP);
+	const cy = GAP + row * (cell + GAP);
+	if (x > cx + cell || y > cy + cell) return -1;
+	return row * n + col;
+}
+
+function shouldShowTargetOutline() {
+	if (state.clickedWrong === -2) return true;
+	if (targetBlinkActive && phase.value === 'playing') return targetBlinkVisible;
+	if (phase.value === 'over') return endReason.value !== 'cleared';
+	return false;
+}
+
+function clearBlinkTimer() {
+	if (!blinkTimer) return;
+	clearInterval(blinkTimer);
+	blinkTimer = 0;
+}
+
+function blinkTarget(times: number, onDone: () => void) {
+	clearBlinkTimer();
+	let toggles = 0;
+	targetBlinkActive = true;
+	targetBlinkVisible = true;
+	draw();
+	blinkTimer = window.setInterval(() => {
+		targetBlinkVisible = !targetBlinkVisible;
+		toggles += 1;
+		draw();
+		if (toggles >= times * 2) {
+			clearBlinkTimer();
+			targetBlinkActive = false;
+			targetBlinkVisible = true;
+			draw();
+			onDone();
+		}
+	}, 500);
+}
+
 function draw() {
 	if (!ctx) return;
 	const b = boardSize.value;
@@ -449,11 +517,14 @@ function draw() {
 				ctx.lineWidth = 4;
 				roundRect(ctx, x + 2, y + 2, cell - 4, cell - 4, 7);
 				ctx.stroke();
-			} else if (state.clickedWrong !== -1 || phase.value === 'over') {
-				ctx.strokeStyle = 'rgba(255,255,255,0.92)';
-				ctx.lineWidth = 3;
-				roundRect(ctx, x + 1.5, y + 1.5, cell - 3, cell - 3, 7);
+			} else if (shouldShowTargetOutline()) {
+				ctx.strokeStyle = 'rgba(255,255,255,0.95)';
+				ctx.lineWidth = 3.5;
+				ctx.shadowColor = 'rgba(255,255,255,0.75)';
+				ctx.shadowBlur = 12;
+				roundRect(ctx, x + 2, y + 2, cell - 4, cell - 4, 7);
 				ctx.stroke();
+				ctx.shadowBlur = 0;
 			}
 		}
 		if (state.clickedWrong >= 0 && i === state.clickedWrong) {
@@ -465,6 +536,9 @@ function draw() {
 }
 
 function newLevel() {
+	clearBlinkTimer();
+	targetBlinkActive = false;
+	targetBlinkVisible = true;
 	const n = gridForLevel(level.value);
 	state.n = n;
 	// 同一局只用一种色系：色相固定为本局 gameHue，重开一局后才换
@@ -494,20 +568,27 @@ function tick() {
 	const left = Math.max(0, endTime - performance.now());
 	timeLeft.value = left;
 	if (left <= 0) {
-		gameOver();
+		locked = true;
+		timeLeft.value = 0;
+		cancelAnimationFrame(rafId);
+		state.clickedWrong = -1;
+		draw();
+		blinkTarget(3, () => gameOver('timeout'));
 		return;
 	}
 	rafId = requestAnimationFrame(tick);
 }
 
-function gameOver() {
+function gameOver(reason: EndReason) {
+	endReason.value = reason;
 	phase.value = 'over';
 	cancelAnimationFrame(rafId);
+	resetCanvasCursor();
 	showKnowledge.value = true;
-	if (cleared.value) {
+	if (reason === 'cleared') {
 		sfxWin();
 		buzz([30, 50, 30, 50, 120]);
-	} else {
+	} else if (reason === 'timeout') {
 		sfxOver();
 		buzz([60, 40, 60, 40, 60]);
 	}
@@ -558,15 +639,8 @@ function handlePoint(e: PointerEvent) {
 	const rect = canvas.getBoundingClientRect();
 	const x = e.clientX - rect.left;
 	const y = e.clientY - rect.top;
-	const n = state.n;
-	const cell = state.cell;
-	const col = Math.floor((x - GAP) / (cell + GAP));
-	const row = Math.floor((y - GAP) / (cell + GAP));
-	if (col < 0 || col >= n || row < 0 || row >= n) return;
-	const cx = GAP + col * (cell + GAP);
-	const cy = GAP + row * (cell + GAP);
-	if (x > cx + cell || y > cy + cell) return; // 落在间隙
-	const idx = row * n + col;
+	const idx = getCellIndexAtPoint(x, y);
+	if (idx < 0) return;
 	if (idx === state.target) {
 		locked = true;
 		state.clickedWrong = -2; // 答对高亮
@@ -577,7 +651,7 @@ function handlePoint(e: PointerEvent) {
 			if (level.value >= MAX_LEVEL) {
 				// 通过第 MAX_LEVEL 关：全部通关，进入结算页恭喜
 				cleared.value = true;
-				gameOver();
+				gameOver('cleared');
 			} else {
 				// 硬钳制：关卡数永远不会超过 MAX_LEVEL
 				level.value = Math.min(level.value + 1, MAX_LEVEL);
@@ -587,12 +661,28 @@ function handlePoint(e: PointerEvent) {
 			locked = false;
 		}, 170);
 	} else {
+		locked = true;
+		timeLeft.value = Math.max(0, endTime - performance.now());
+		cancelAnimationFrame(rafId);
 		state.clickedWrong = idx;
 		draw();
 		sfxWrong();
 		buzz([40, 30, 40]);
-		gameOver();
+		blinkTarget(3, () => gameOver('wrong'));
 	}
+}
+
+function handlePointerMove(e: PointerEvent) {
+	if (phase.value !== 'playing' || locked) {
+		resetCanvasCursor();
+		return;
+	}
+	const canvas = canvasRef.value;
+	if (!canvas) return;
+	const rect = canvas.getBoundingClientRect();
+	const x = e.clientX - rect.left;
+	const y = e.clientY - rect.top;
+	setCanvasCursor(getCellIndexAtPoint(x, y) >= 0 ? 'pointer' : 'default');
 }
 
 function onReplay() {
@@ -609,6 +699,10 @@ function startGame() {
 	level.value = 1;
 	locked = false;
 	cleared.value = false;
+	clearBlinkTimer();
+	targetBlinkActive = false;
+	targetBlinkVisible = true;
+	endReason.value = 'wrong';
 	phase.value = 'playing';
 	calcBoard();
 	setupCanvas();
@@ -620,7 +714,7 @@ function startGame() {
 function onResize() {
 	calcBoard();
 	setupCanvas();
-	if (phase.value === 'playing') {
+	if (phase.value !== 'ready') {
 		state.cell = (boardSize.value - GAP * (state.n + 1)) / state.n;
 		draw();
 	}
@@ -633,6 +727,8 @@ onMounted(() => {
 });
 onBeforeUnmount(() => {
 	cancelAnimationFrame(rafId);
+	clearBlinkTimer();
+	targetBlinkActive = false;
 	window.removeEventListener('resize', onResize);
 });
 </script>
@@ -699,6 +795,7 @@ onBeforeUnmount(() => {
 	display: block;
 	touch-action: none;
 	user-select: none;
+	cursor: default;
 }
 
 .overlay {
@@ -767,6 +864,7 @@ onBeforeUnmount(() => {
 .result div {
 	display: flex;
 	justify-content: space-between;
+    align-items: center;
 	gap: 28px;
 	font-size: 15px;
 	color: var(--muted);
