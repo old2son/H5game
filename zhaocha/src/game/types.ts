@@ -6,11 +6,17 @@ export interface DiffBox {
   h: number
 }
 
+export interface Point {
+  x: number
+  y: number
+}
+
 /** 单处差异：名称 + 命中框 + 两种状态的绘制函数 */
 export interface Diff {
   name: string
   bbox: DiffBox
-  paint: (ctx: CanvasRenderingContext2D, variant: number) => void
+  bottomBox?: DiffBox
+  paint?: (ctx: CanvasRenderingContext2D, variant: number) => void
 }
 
 /** 一个关卡场景 */
@@ -20,6 +26,15 @@ export interface Scene {
   tip: string
   diffs: Diff[]
   render: (ctx: CanvasRenderingContext2D, variant: number) => void
+  boardMode?: 'dual' | 'stacked'
+  boardSize?: {
+    width: number
+    height: number
+  }
+  mapTapPoint?: (point: Point) => Point | null
+  getTapBox?: (diff: Diff, point: Point) => DiffBox
+  getMarkerPoints?: (diff: Diff) => Point[]
+  getDebugBoxes?: (diff: Diff) => DiffBox[]
 }
 
 /** 逻辑画布尺寸 */
