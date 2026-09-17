@@ -1,9 +1,11 @@
-/** 差异命中框（逻辑坐标，基于 400x400 画布） */
+/** 差异命中框（逻辑坐标，基于 400x400 画布；angle 为顺时针角度，radius 为圆角半径） */
 export interface DiffBox {
   x: number
   y: number
   w: number
   h: number
+  angle?: number
+  radius?: number
 }
 
 export interface Point {

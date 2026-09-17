@@ -10,14 +10,46 @@
  *   - scene.render(ctx, variant)：variant 0 = 原图，1 = 含全部差异的图。
  *   - diff.paint(ctx, variant)：绘制该处差异元素（0/1 两种状态）。
  * ===========================================================================*/
-import posturePhotoUrl from '../../eye-find-diff/duxiezishi.png';
+import posturePhotoUrl from '../assets/duxiezishi.png';
+import lightPhotoUrl from '../assets/guangxianhuanjing.png';
+import durationPhotoUrl from '../assets/yongyanshichang.png';
+import screenPhotoUrl from '../assets/yongyanjuli.png';
+import outdoorPhotoUrl from '../assets/huwaiyundong.png';
 import { S, type Diff, type DiffBox, type Point, type Scene } from './types';
 
 const posturePhoto = typeof Image === 'undefined' ? null : new Image();
+const lightPhoto = typeof Image === 'undefined' ? null : new Image();
+const durationPhoto = typeof Image === 'undefined' ? null : new Image();
+const screenPhoto = typeof Image === 'undefined' ? null : new Image();
+const outdoorPhoto = typeof Image === 'undefined' ? null : new Image();
 
 if (posturePhoto) {
 	posturePhoto.src = posturePhotoUrl;
 	posturePhoto.addEventListener('load', () => {
+		window.dispatchEvent(new Event('scene-assets-ready'));
+	});
+}
+if (lightPhoto) {
+	lightPhoto.src = lightPhotoUrl;
+	lightPhoto.addEventListener('load', () => {
+		window.dispatchEvent(new Event('scene-assets-ready'));
+	});
+}
+if (durationPhoto) {
+	durationPhoto.src = durationPhotoUrl;
+	durationPhoto.addEventListener('load', () => {
+		window.dispatchEvent(new Event('scene-assets-ready'));
+	});
+}
+if (screenPhoto) {
+	screenPhoto.src = screenPhotoUrl;
+	screenPhoto.addEventListener('load', () => {
+		window.dispatchEvent(new Event('scene-assets-ready'));
+	});
+}
+if (outdoorPhoto) {
+	outdoorPhoto.src = outdoorPhotoUrl;
+	outdoorPhoto.addEventListener('load', () => {
 		window.dispatchEvent(new Event('scene-assets-ready'));
 	});
 }
@@ -94,70 +126,176 @@ function drawDesk(ctx: CanvasRenderingContext2D, x: number, y: number, w: number
 	ctx.fillRect(x + 10, y + 16, 12, 84);
 	ctx.fillRect(x + w - 22, y + 16, 12, 84);
 }
-function drawPosturePhoto(ctx: CanvasRenderingContext2D) {
-	if (!posturePhoto?.complete || !posturePhoto.naturalWidth || !posturePhoto.naturalHeight) return false;
-	ctx.drawImage(posturePhoto, 0, postureStackLayout.topY, S, postureStackLayout.panelHeight * 2);
+function drawStackedPhoto(
+	ctx: CanvasRenderingContext2D,
+	image: HTMLImageElement | null,
+	layout: { topY: number; panelHeight: number }
+) {
+	if (!image?.complete || !image.naturalWidth || !image.naturalHeight) return false;
+	ctx.drawImage(image, 0, layout.topY, S, layout.panelHeight * 2);
 	return true;
+}
+function drawPosturePhoto(ctx: CanvasRenderingContext2D) {
+	return drawStackedPhoto(ctx, posturePhoto, postureStackLayout);
+}
+function drawLightPhoto(ctx: CanvasRenderingContext2D) {
+	return drawStackedPhoto(ctx, lightPhoto, lightStackLayout);
+}
+function drawDurationPhoto(ctx: CanvasRenderingContext2D) {
+	return drawStackedPhoto(ctx, durationPhoto, durationStackLayout);
+}
+function drawScreenPhoto(ctx: CanvasRenderingContext2D) {
+	return drawStackedPhoto(ctx, screenPhoto, screenStackLayout);
+}
+function drawOutdoorPhoto(ctx: CanvasRenderingContext2D) {
+	return drawStackedPhoto(ctx, outdoorPhoto, outdoorStackLayout);
 }
 
 const postureStackLayout = {
 	width: S,
-	// height: 620,
-	// topY: 5,
+	height: 600,
+	topY: 0,
+	panelHeight: 300
+};
+const lightStackLayout = {
+	width: S,
+	height: 600,
+	topY: 0,
+	panelHeight: 300
+};
+const durationStackLayout = {
+	width: S,
+	height: 600,
+	topY: 0,
+	panelHeight: 300
+};
+const screenStackLayout = {
+	width: S,
+	height: 600,
+	topY: 0,
+	panelHeight: 300
+};
+const outdoorStackLayout = {
+	width: S,
 	height: 600,
 	topY: 0,
 	panelHeight: 300
 };
 
-function mapPostureTapPoint(point: Point): Point | null {
+function mapStackedTapPoint(point: Point, layout: { topY: number; panelHeight: number }): Point | null {
 	const { x, y } = point;
-	const secondPanelY = postureStackLayout.topY + postureStackLayout.panelHeight;
-	const inTopPanel = y >= postureStackLayout.topY && y <= postureStackLayout.topY + postureStackLayout.panelHeight;
-	const inBottomPanel = y >= secondPanelY && y <= secondPanelY + postureStackLayout.panelHeight;
+	const secondPanelY = layout.topY + layout.panelHeight;
+	const inTopPanel = y >= layout.topY && y <= layout.topY + layout.panelHeight;
+	const inBottomPanel = y >= secondPanelY && y <= secondPanelY + layout.panelHeight;
 
 	if (!inTopPanel && !inBottomPanel) return null;
 
-	const panelStartY = inBottomPanel ? secondPanelY : postureStackLayout.topY;
+	const panelStartY = inBottomPanel ? secondPanelY : layout.topY;
 	return {
 		x,
-		y: ((y - panelStartY) / postureStackLayout.panelHeight) * S
+		y: ((y - panelStartY) / layout.panelHeight) * S
 	};
 }
 
-function getPostureTapBox(diff: Diff, point: Point): DiffBox {
-  const secondPanelY = postureStackLayout.topY + postureStackLayout.panelHeight;
-  return point.y >= secondPanelY ? diff.bottomBox || diff.bbox : diff.bbox;
+function mapPostureTapPoint(point: Point) {
+	return mapStackedTapPoint(point, postureStackLayout);
+}
+function mapLightTapPoint(point: Point) {
+	return mapStackedTapPoint(point, lightStackLayout);
+}
+function mapDurationTapPoint(point: Point) {
+	return mapStackedTapPoint(point, durationStackLayout);
+}
+function mapScreenTapPoint(point: Point) {
+	return mapStackedTapPoint(point, screenStackLayout);
+}
+function mapOutdoorTapPoint(point: Point) {
+	return mapStackedTapPoint(point, outdoorStackLayout);
 }
 
-function getPostureMarkerPoints(diff: Diff): Point[] {
-  const topBox = diff.bbox;
-  const bottomBox = diff.bottomBox || diff.bbox;
-	const secondPanelY = postureStackLayout.topY + postureStackLayout.panelHeight;
-  const topY = ((topBox.y + topBox.h / 2) / S) * postureStackLayout.panelHeight;
-  const bottomY = ((bottomBox.y + bottomBox.h / 2) / S) * postureStackLayout.panelHeight;
+function getStackedTapBox(diff: Diff, point: Point, layout: { topY: number; panelHeight: number }): DiffBox {
+	const secondPanelY = layout.topY + layout.panelHeight;
+	return point.y >= secondPanelY ? diff.bottomBox || diff.bbox : diff.bbox;
+}
+function getPostureTapBox(diff: Diff, point: Point): DiffBox {
+	return getStackedTapBox(diff, point, postureStackLayout);
+}
+function getLightTapBox(diff: Diff, point: Point): DiffBox {
+	return getStackedTapBox(diff, point, lightStackLayout);
+}
+function getDurationTapBox(diff: Diff, point: Point): DiffBox {
+	return getStackedTapBox(diff, point, durationStackLayout);
+}
+function getScreenTapBox(diff: Diff, point: Point): DiffBox {
+	return getStackedTapBox(diff, point, screenStackLayout);
+}
+function getOutdoorTapBox(diff: Diff, point: Point): DiffBox {
+	return getStackedTapBox(diff, point, outdoorStackLayout);
+}
+
+function getStackedMarkerPoints(diff: Diff, layout: { topY: number; panelHeight: number }): Point[] {
+	const topBox = diff.bbox;
+	const bottomBox = diff.bottomBox || diff.bbox;
+	const secondPanelY = layout.topY + layout.panelHeight;
+	const topY = ((topBox.y + topBox.h / 2) / S) * layout.panelHeight;
+	const bottomY = ((bottomBox.y + bottomBox.h / 2) / S) * layout.panelHeight;
 	return [
-          { x: topBox.x + topBox.w / 2, y: postureStackLayout.topY + topY },
-          { x: bottomBox.x + bottomBox.w / 2, y: secondPanelY + bottomY }
+		{ x: topBox.x + topBox.w / 2, y: layout.topY + topY },
+		{ x: bottomBox.x + bottomBox.w / 2, y: secondPanelY + bottomY }
+	];
+}
+function getPostureMarkerPoints(diff: Diff): Point[] {
+	return getStackedMarkerPoints(diff, postureStackLayout);
+}
+function getLightMarkerPoints(diff: Diff): Point[] {
+	return getStackedMarkerPoints(diff, lightStackLayout);
+}
+function getDurationMarkerPoints(diff: Diff): Point[] {
+	return getStackedMarkerPoints(diff, durationStackLayout);
+}
+function getScreenMarkerPoints(diff: Diff): Point[] {
+	return getStackedMarkerPoints(diff, screenStackLayout);
+}
+function getOutdoorMarkerPoints(diff: Diff): Point[] {
+	return getStackedMarkerPoints(diff, outdoorStackLayout);
+}
+function getStackedDebugBoxes(diff: Diff, layout: { topY: number; panelHeight: number }): DiffBox[] {
+	const topBox = diff.bbox;
+	const bottomBox = diff.bottomBox || diff.bbox;
+	const secondPanelY = layout.topY + layout.panelHeight;
+	return [
+		{
+			x: topBox.x,
+			y: layout.topY + (topBox.y / S) * layout.panelHeight,
+			w: topBox.w,
+			h: (topBox.h / S) * layout.panelHeight,
+			angle: topBox.angle,
+			radius: topBox.radius
+		},
+		{
+			x: bottomBox.x,
+			y: secondPanelY + (bottomBox.y / S) * layout.panelHeight,
+			w: bottomBox.w,
+			h: (bottomBox.h / S) * layout.panelHeight,
+			angle: bottomBox.angle,
+			radius: bottomBox.radius
+		}
 	];
 }
 function getPostureDebugBoxes(diff: Diff): DiffBox[] {
-  const topBox = diff.bbox;
-  const bottomBox = diff.bottomBox || diff.bbox;
-	const secondPanelY = postureStackLayout.topY + postureStackLayout.panelHeight;
-	return [
-		{
-                  x: topBox.x,
-                  y: postureStackLayout.topY + (topBox.y / S) * postureStackLayout.panelHeight,
-                  w: topBox.w,
-                  h: (topBox.h / S) * postureStackLayout.panelHeight
-		},
-		{
-                  x: bottomBox.x,
-                  y: secondPanelY + (bottomBox.y / S) * postureStackLayout.panelHeight,
-                  w: bottomBox.w,
-                  h: (bottomBox.h / S) * postureStackLayout.panelHeight
-		}
-	];
+	return getStackedDebugBoxes(diff, postureStackLayout);
+}
+function getLightDebugBoxes(diff: Diff): DiffBox[] {
+	return getStackedDebugBoxes(diff, lightStackLayout);
+}
+function getDurationDebugBoxes(diff: Diff): DiffBox[] {
+	return getStackedDebugBoxes(diff, durationStackLayout);
+}
+function getScreenDebugBoxes(diff: Diff): DiffBox[] {
+	return getStackedDebugBoxes(diff, screenStackLayout);
+}
+function getOutdoorDebugBoxes(diff: Diff): DiffBox[] {
+	return getStackedDebugBoxes(diff, outdoorStackLayout);
 }
 
 /* ===========================================================================
@@ -166,7 +304,7 @@ function getPostureDebugBoxes(diff: Diff): DiffBox[] {
 const postureDiffs: Diff[] = [
 	{
 		name: '孩子坐姿',
-		bbox: { x: 210, y: 140, w: 36, h: 100 }
+		bbox: { x: 210, y: 140, w: 36, h: 100, angle: 0 }
 	},
 	{
 		name: '书本距离',
@@ -194,7 +332,7 @@ const scenePosture: Scene = {
 	boardMode: 'stacked',
 	boardSize: postureStackLayout,
 	mapTapPoint: mapPostureTapPoint,
-  getTapBox: getPostureTapBox,
+	getTapBox: getPostureTapBox,
 	getMarkerPoints: getPostureMarkerPoints,
 	getDebugBoxes: getPostureDebugBoxes,
 	diffs: postureDiffs,
@@ -208,135 +346,24 @@ const scenePosture: Scene = {
  * ========================================================================= */
 const lightDiffs: Diff[] = [
 	{
-		name: '顶灯',
-		bbox: { x: 168, y: 18, w: 64, h: 40 },
-		paint(ctx, v) {
-			const on = v === 0;
-			ctx.fillStyle = '#777';
-			rr(ctx, 184, 30, 32, 8, 2);
-			ctx.fill();
-			ctx.fillStyle = on ? '#fff4c2' : '#b8bdc4';
-			ctx.beginPath();
-			ctx.moveTo(176, 38);
-			ctx.lineTo(224, 38);
-			ctx.lineTo(214, 52);
-			ctx.lineTo(186, 52);
-			ctx.closePath();
-			ctx.fill();
-			if (on) {
-				ctx.fillStyle = 'rgba(255,244,194,0.35)';
-				ctx.beginPath();
-				ctx.moveTo(200, 52);
-				ctx.lineTo(120, 300);
-				ctx.lineTo(280, 300);
-				ctx.closePath();
-				ctx.fill();
-			}
-		}
+		name: '头顶灯',
+		bbox: { x: 160, y: 3, w: 79, h: 26 }
 	},
 	{
 		name: '台灯',
-		bbox: { x: 328, y: 206, w: 60, h: 72 },
-		paint(ctx, v) {
-			const on = v === 0;
-			ctx.strokeStyle = '#555';
-			ctx.lineWidth = 4;
-			ctx.beginPath();
-			ctx.moveTo(356, 264);
-			ctx.lineTo(356, 230);
-			ctx.lineTo(344, 216);
-			ctx.stroke();
-			ctx.fillStyle = on ? '#ffd24d' : '#9aa0a6';
-			ctx.beginPath();
-			ctx.moveTo(330, 218);
-			ctx.lineTo(362, 218);
-			ctx.lineTo(356, 206);
-			ctx.lineTo(336, 206);
-			ctx.closePath();
-			ctx.fill();
-			if (on) {
-				ctx.fillStyle = 'rgba(255,221,120,0.45)';
-				circle(ctx, 344, 224, 40);
-				ctx.fill();
-			}
-		}
+		bbox: { x: 288, y: 120, w: 40, h: 40, angle: 32 }
 	},
 	{
-		name: '窗帘',
-		bbox: { x: 150, y: 46, w: 130, h: 150 },
-		paint(ctx, v) {
-			const closed = v === 1;
-			if (closed) {
-				ctx.fillStyle = '#f4b6c2';
-				rr(ctx, 150, 46, 64, 150, 4);
-				ctx.fill();
-				rr(ctx, 216, 46, 64, 150, 4);
-				ctx.fill();
-				ctx.strokeStyle = 'rgba(0,0,0,0.08)';
-				ctx.lineWidth = 2;
-				for (let i = 0; i < 4; i++) {
-					ctx.beginPath();
-					ctx.moveTo(158 + i * 16, 50);
-					ctx.lineTo(158 + i * 16, 192);
-					ctx.stroke();
-				}
-			}
-		}
+		name: '笔筒',
+		bbox: { x: 302, y: 204, w: 26, h: 70 }
 	},
 	{
-		name: '窗外天色',
-		bbox: { x: 150, y: 46, w: 130, h: 150 },
-		paint(ctx, v) {
-			const night = v === 1;
-			ctx.fillStyle = night ? '#1c2540' : '#bfe3f2';
-			rr(ctx, 152, 48, 126, 146, 6);
-			ctx.fill();
-			ctx.strokeStyle = '#fff';
-			ctx.lineWidth = 4;
-			rr(ctx, 152, 48, 126, 146, 6);
-			ctx.stroke();
-			if (night) {
-				ctx.fillStyle = '#fff';
-				[
-					[190, 90],
-					[230, 120],
-					[260, 80],
-					[210, 150]
-				].forEach((p) => roundDot(ctx, p[0], p[1], 2.5, '#fff'));
-				ctx.fillStyle = '#ffe27a';
-				circle(ctx, 250, 100, 16);
-				ctx.fill();
-			} else {
-				ctx.fillStyle = '#fff';
-				circle(ctx, 240, 95, 18);
-				ctx.fill();
-			}
-		}
+		name: '铅笔盒',
+		bbox: { x: 300, y: 290, w: 80, h: 48, angle: -19 }
 	},
 	{
-		name: '屏幕眩光',
-		bbox: { x: 188, y: 196, w: 80, h: 64 },
-		paint(ctx, v) {
-			ctx.fillStyle = '#2c3140';
-			rr(ctx, 188, 200, 80, 56, 4);
-			ctx.fill();
-			ctx.fillStyle = v === 1 ? '#7fb6ff' : '#cfe6ff';
-			rr(ctx, 194, 206, 68, 44, 2);
-			ctx.fill();
-			ctx.fillStyle = '#2c3140';
-			rr(ctx, 220, 256, 16, 8, 2);
-			ctx.fill();
-			if (v === 1) {
-				ctx.fillStyle = 'rgba(255,255,255,0.6)';
-				ctx.beginPath();
-				ctx.moveTo(196, 208);
-				ctx.lineTo(228, 208);
-				ctx.lineTo(200, 248);
-				ctx.lineTo(196, 248);
-				ctx.closePath();
-				ctx.fill();
-			}
-		}
+		name: '壁画',
+		bbox: { x: 215, y: 61, w: 52, h: 66 }
 	}
 ];
 
@@ -344,15 +371,15 @@ const sceneLight: Scene = {
 	name: '光线环境',
 	desc: '读写要在充足、均匀的光线下进行；光线应从左上方来，避免眩光与阴影。',
 	tip: '开主灯 + 台灯，屏幕避开反光。',
+	boardMode: 'stacked',
+	boardSize: lightStackLayout,
+	mapTapPoint: mapLightTapPoint,
+	getTapBox: getLightTapBox,
+	getMarkerPoints: getLightMarkerPoints,
+	getDebugBoxes: getLightDebugBoxes,
 	diffs: lightDiffs,
 	render(ctx, v) {
-		drawRoom(ctx, '#eef1f6', '#dfe4ee', '#cdbfa6');
-		paintDiff(lightDiffs[0], ctx, v);
-		paintDiff(lightDiffs[3], ctx, v);
-		paintDiff(lightDiffs[2], ctx, v);
-		drawDesk(ctx, 150, 264, 230);
-		paintDiff(lightDiffs[4], ctx, v);
-		paintDiff(lightDiffs[1], ctx, v);
+		drawLightPhoto(ctx);
 	}
 };
 
@@ -362,119 +389,23 @@ const sceneLight: Scene = {
 const durationDiffs: Diff[] = [
 	{
 		name: '墙上时钟',
-		bbox: { x: 290, y: 50, w: 84, h: 84 },
-		paint(ctx, v) {
-			const long = v === 1;
-			ctx.fillStyle = '#fff';
-			circle(ctx, 332, 92, 36);
-			ctx.fill();
-			ctx.strokeStyle = '#444';
-			ctx.lineWidth = 3;
-			circle(ctx, 332, 92, 36);
-			ctx.stroke();
-			ctx.strokeStyle = '#222';
-			ctx.lineWidth = 4;
-			ctx.lineCap = 'round';
-			ctx.beginPath();
-			ctx.moveTo(332, 92);
-			ctx.lineTo(332, long ? 64 : 74);
-			ctx.stroke();
-			ctx.beginPath();
-			ctx.moveTo(332, 92);
-			ctx.lineTo(long ? 354 : 348, 92);
-			ctx.stroke();
-			text(ctx, long ? '2小时' : '20分', 332, 140, 13, long ? '#e74c3c' : '#2ecc71');
-		}
+		bbox: { x: 290, y: 10, w: 53, h: 73, radius: 25 }
 	},
 	{
 		name: '休息提示牌',
-		bbox: { x: 300, y: 232, w: 70, h: 40 },
-		paint(ctx, v) {
-			if (v === 1) return;
-			ctx.fillStyle = '#2ecc71';
-			rr(ctx, 304, 234, 62, 30, 5);
-			ctx.fill();
-			text(ctx, '休息一下', 335, 249, 13, '#fff');
-		}
+		bbox: { x: 339, y: 220, w: 40, h: 28 }
+	},
+	{
+		name: '盆栽',
+		bbox: { x: 380, y: 198, w: 19, h: 43 }
 	},
 	{
 		name: '眼睛状态',
-		bbox: { x: 176, y: 150, w: 80, h: 60 },
-		paint(ctx, v) {
-			const tired = v === 1;
-			const cx = 214;
-			const headY = 176;
-			ctx.fillStyle = '#5b8def';
-			rr(ctx, cx - 34, 214, 68, 74, 20);
-			ctx.fill();
-			ctx.strokeStyle = '#5b8def';
-			ctx.lineWidth = 14;
-			ctx.lineCap = 'round';
-			ctx.beginPath();
-			ctx.moveTo(cx - 26, 222);
-			ctx.lineTo(cx - 6, 262);
-			ctx.moveTo(cx + 26, 222);
-			ctx.lineTo(cx + 8, 262);
-			ctx.stroke();
-			roundDot(ctx, cx - 6, 264, 7, '#ffd9b3');
-			roundDot(ctx, cx + 8, 264, 7, '#ffd9b3');
-			roundDot(ctx, cx, headY, 23, '#ffd9b3');
-			ctx.fillStyle = '#3a2a1d';
-			ctx.beginPath();
-			ctx.arc(cx, headY, 23, Math.PI * 1.02, Math.PI * 1.98);
-			ctx.fill();
-			if (tired) {
-				ctx.strokeStyle = '#333';
-				ctx.lineWidth = 2;
-				ctx.beginPath();
-				ctx.moveTo(cx - 12, headY - 3);
-				ctx.lineTo(cx - 4, headY - 3);
-				ctx.moveTo(cx + 4, headY - 3);
-				ctx.lineTo(cx + 12, headY - 3);
-				ctx.stroke();
-				ctx.strokeStyle = '#8a6d3b';
-				ctx.beginPath();
-				ctx.arc(cx - 9, headY + 6, 5, 0, Math.PI);
-				ctx.arc(cx + 9, headY + 6, 5, 0, Math.PI);
-				ctx.stroke();
-			} else {
-				roundDot(ctx, cx - 9, headY - 2, 3, '#333');
-				roundDot(ctx, cx + 9, headY - 2, 3, '#333');
-			}
-		}
-	},
-	{
-		name: '书本堆',
-		bbox: { x: 150, y: 224, w: 60, h: 50 },
-		paint(ctx, v) {
-			const tall = v === 1;
-			const n = tall ? 4 : 1;
-			for (let i = 0; i < n; i++) {
-				const yy = 262 - i * 11;
-				ctx.fillStyle = ['#e07a5f', '#81b29a', '#f2cc8f', '#6d8ea0'][i % 4];
-				rr(ctx, 154 + i, yy - 9, 52 - i * 2, 10, 2);
-				ctx.fill();
-			}
-		}
+		bbox: { x: 112, y: 154, w: 18, h: 28 }
 	},
 	{
 		name: '水杯',
-		bbox: { x: 320, y: 236, w: 34, h: 36 },
-		paint(ctx, v) {
-			const empty = v === 1;
-			ctx.fillStyle = '#cfe8f5';
-			rr(ctx, 324, 240, 24, 26, 4);
-			ctx.fill();
-			ctx.strokeStyle = '#7fb6d6';
-			ctx.lineWidth = 2;
-			rr(ctx, 324, 240, 24, 26, 4);
-			ctx.stroke();
-			if (!empty) {
-				ctx.fillStyle = '#4aa3df';
-				rr(ctx, 327, 248, 18, 15, 2);
-				ctx.fill();
-			}
-		}
+		bbox: { x: 170, y: 278, w: 40, h: 36 }
 	}
 ];
 
@@ -482,15 +413,15 @@ const sceneDuration: Scene = {
 	name: '用眼时长',
 	desc: '近距离用眼 20~30 分钟，就远眺 20 秒（20-20-20 法则），让眼睛休息。',
 	tip: '定时休息，别连续苦读两小时。',
+	boardMode: 'stacked',
+	boardSize: durationStackLayout,
+	mapTapPoint: mapDurationTapPoint,
+	getTapBox: getDurationTapBox,
+	getMarkerPoints: getDurationMarkerPoints,
+	getDebugBoxes: getDurationDebugBoxes,
 	diffs: durationDiffs,
 	render(ctx, v) {
-		drawRoom(ctx, '#fdf3e7', '#f3e6d2', '#d9b38c');
-		paintDiff(durationDiffs[0], ctx, v);
-		drawDesk(ctx, 140, 268, 240);
-		paintDiff(durationDiffs[2], ctx, v);
-		paintDiff(durationDiffs[3], ctx, v);
-		paintDiff(durationDiffs[4], ctx, v);
-		paintDiff(durationDiffs[1], ctx, v);
+		drawDurationPhoto(ctx);
 	}
 };
 
@@ -499,113 +430,26 @@ const sceneDuration: Scene = {
  * ========================================================================= */
 const screenDiffs: Diff[] = [
 	{
-		name: '人脸距离',
-		bbox: { x: 120, y: 150, w: 150, h: 120 },
-		paint(ctx, v) {
-			const close = v === 1;
-			if (!close) {
-				ctx.strokeStyle = '#2ecc71';
-				ctx.lineWidth = 3;
-				ctx.setLineDash([6, 4]);
-				ctx.beginPath();
-				ctx.moveTo(196, 210);
-				ctx.lineTo(248, 210);
-				ctx.stroke();
-				ctx.setLineDash([]);
-				text(ctx, '一臂远', 222, 198, 12, '#2ecc71');
-			}
-		}
+		name: '手臂',
+		bbox: { x: 110, y: 140, w: 60, h: 68 },
+		bottomBox: { x: 110, y: 140, w: 50, h: 68 }
 	},
 	{
-		name: '屏幕高度',
-		bbox: { x: 250, y: 170, w: 110, h: 110 },
-		paint(ctx, v) {
-			const low = v === 1;
-			const topY = low ? 232 : 196;
-			ctx.fillStyle = '#2c3140';
-			rr(ctx, 280, topY, 78, 58, 4);
-			ctx.fill();
-			ctx.fillStyle = '#1c2230';
-			rr(ctx, 300, topY + 58, 38, 8, 2);
-			ctx.fill();
-			ctx.fillStyle = '#3a4150';
-			rr(ctx, 308, topY + 66, 22, 6, 2);
-			ctx.fill();
-		}
+		name: '手机挂饰',
+		bbox: { x: 185, y: 130, w: 20, h: 30 },
+		bottomBox: { x: 165, y: 135, w: 15, h: 30 }
 	},
 	{
-		name: '护眼模式',
-		bbox: { x: 282, y: 192, w: 74, h: 56 },
-		paint(ctx, v) {
-			const low = v === 1;
-			const topY = low ? 236 : 200;
-			ctx.fillStyle = v === 1 ? '#8ec5ff' : '#ffe9b0';
-			rr(ctx, 286, topY + 4, 66, 44, 2);
-			ctx.fill();
-			if (v === 0) {
-				ctx.fillStyle = 'rgba(255,180,80,0.25)';
-				rr(ctx, 286, topY + 4, 66, 44, 2);
-				ctx.fill();
-			}
-		}
+		name: '眼镜',
+		bbox: { x: 120, y: 105, w: 30, h: 30 }
 	},
 	{
-		name: '坐姿',
-		bbox: { x: 96, y: 150, w: 110, h: 150 },
-		paint(ctx, v) {
-			const close = v === 1;
-			const cx = close ? 168 : 150;
-			const headX = close ? 196 : 168;
-			const headY = close ? 196 : 184;
-			ctx.fillStyle = '#ef7d54';
-			rr(ctx, cx - 30, 226, 60, 70, 20);
-			ctx.fill();
-			ctx.strokeStyle = '#ef7d54';
-			ctx.lineWidth = 14;
-			ctx.lineCap = 'round';
-			ctx.beginPath();
-			ctx.moveTo(cx + 18, 236);
-			ctx.lineTo(cx + 30, 262);
-			ctx.moveTo(cx + 24, 236);
-			ctx.lineTo(cx + 40, 262);
-			ctx.stroke();
-			roundDot(ctx, cx + 30, 264, 7, '#ffd9b3');
-			roundDot(ctx, cx + 40, 264, 7, '#ffd9b3');
-			roundDot(ctx, headX, headY, 22, '#ffd9b3');
-			ctx.fillStyle = '#2e2a26';
-			ctx.beginPath();
-			ctx.arc(headX, headY, 22, Math.PI * 1.02, Math.PI * 1.98);
-			ctx.fill();
-			roundDot(ctx, headX - 8, headY - 1, 2.6, '#333');
-			roundDot(ctx, headX + 8, headY - 1, 2.6, '#333');
-		}
+		name: '抱枕',
+		bbox: { x: 30, y: 180, w: 66, h: 66, radius: 30 }
 	},
 	{
-		name: '环境顶灯',
-		bbox: { x: 168, y: 16, w: 64, h: 42 },
-		paint(ctx, v) {
-			const on = v === 0;
-			ctx.fillStyle = '#777';
-			rr(ctx, 184, 28, 32, 8, 2);
-			ctx.fill();
-			ctx.fillStyle = on ? '#fff4c2' : '#b8bdc4';
-			ctx.beginPath();
-			ctx.moveTo(176, 36);
-			ctx.lineTo(224, 36);
-			ctx.lineTo(214, 52);
-			ctx.lineTo(186, 52);
-			ctx.closePath();
-			ctx.fill();
-			if (on) {
-				ctx.fillStyle = 'rgba(255,244,194,0.3)';
-				ctx.beginPath();
-				ctx.moveTo(200, 52);
-				ctx.lineTo(150, 240);
-				ctx.lineTo(250, 240);
-				ctx.closePath();
-				ctx.fill();
-			}
-		}
+		name: '盆栽',
+		bbox: { x: 310, y: 86, w: 36, h: 62 }
 	}
 ];
 
@@ -613,23 +457,15 @@ const sceneScreen: Scene = {
 	name: '屏幕距离',
 	desc: '看屏幕保持一臂距离（约 50~70cm），屏幕顶端与视线平齐，并开启护眼模式。',
 	tip: '屏幕别凑太近，开护眼滤蓝光。',
+	boardMode: 'stacked',
+	boardSize: screenStackLayout,
+	mapTapPoint: mapScreenTapPoint,
+	getTapBox: getScreenTapBox,
+	getMarkerPoints: getScreenMarkerPoints,
+	getDebugBoxes: getScreenDebugBoxes,
 	diffs: screenDiffs,
 	render(ctx, v) {
-		drawRoom(
-			ctx,
-			v === 1 ? '#2a2f3a' : '#eef1f6',
-			v === 1 ? '#222632' : '#dfe4ee',
-			v === 1 ? '#3a3f4a' : '#cdbfa6'
-		);
-		if (v === 1) {
-			ctx.fillStyle = 'rgba(0,0,0,0.18)';
-			ctx.fillRect(0, 0, 400, 400);
-		}
-		paintDiff(screenDiffs[4], ctx, v);
-		paintDiff(screenDiffs[2], ctx, v);
-		paintDiff(screenDiffs[1], ctx, v);
-		paintDiff(screenDiffs[3], ctx, v);
-		paintDiff(screenDiffs[0], ctx, v);
+		drawScreenPhoto(ctx);
 	}
 };
 
@@ -638,145 +474,24 @@ const sceneScreen: Scene = {
  * ========================================================================= */
 const outdoorDiffs: Diff[] = [
 	{
-		name: '太阳',
-		bbox: { x: 40, y: 30, w: 90, h: 90 },
-		paint(ctx, v) {
-			if (v === 1) {
-				ctx.fillStyle = '#ffffff';
-				circle(ctx, 80, 80, 26);
-				ctx.fill();
-				circle(ctx, 110, 80, 22);
-				ctx.fill();
-				circle(ctx, 95, 66, 22);
-				ctx.fill();
-				return;
-			}
-			ctx.fillStyle = '#ffd24d';
-			circle(ctx, 80, 80, 26);
-			ctx.fill();
-			ctx.strokeStyle = '#ffd24d';
-			ctx.lineWidth = 4;
-			for (let i = 0; i < 8; i++) {
-				const a = (i * Math.PI) / 4;
-				ctx.beginPath();
-				ctx.moveTo(80 + Math.cos(a) * 32, 80 + Math.sin(a) * 32);
-				ctx.lineTo(80 + Math.cos(a) * 44, 80 + Math.sin(a) * 44);
-				ctx.stroke();
-			}
-		}
+		name: '小鸟',
+		bbox: { x: 72, y: 23, w: 30, h: 40 }
 	},
 	{
-		name: '孩子活动',
-		bbox: { x: 150, y: 210, w: 100, h: 150 },
-		paint(ctx, v) {
-			const sit = v === 1;
-			if (sit) {
-				ctx.fillStyle = 'rgba(120,120,160,0.25)';
-				rr(ctx, 158, 220, 92, 110, 8);
-				ctx.fill();
-				const cx = 204;
-				roundDot(ctx, cx, 250, 20, '#ffd9b3');
-				ctx.fillStyle = '#5b8def';
-				rr(ctx, cx - 24, 270, 48, 50, 14);
-				ctx.fill();
-				ctx.fillStyle = '#3a2a1d';
-				ctx.beginPath();
-				ctx.arc(cx, 250, 20, Math.PI * 1.02, Math.PI * 1.98);
-				ctx.fill();
-				roundDot(ctx, cx - 7, 249, 2.6, '#333');
-				roundDot(ctx, cx + 7, 249, 2.6, '#333');
-				text(ctx, '宅家', cx, 335, 13, '#555');
-			} else {
-				const cx = 200;
-				ctx.strokeStyle = '#ef7d54';
-				ctx.lineWidth = 16;
-				ctx.lineCap = 'round';
-				ctx.beginPath();
-				ctx.moveTo(cx - 6, 300);
-				ctx.lineTo(cx - 14, 340);
-				ctx.moveTo(cx + 6, 300);
-				ctx.lineTo(cx + 18, 342);
-				ctx.stroke();
-				ctx.fillStyle = '#ef7d54';
-				rr(ctx, cx - 22, 268, 44, 40, 16);
-				ctx.fill();
-				roundDot(ctx, cx, 250, 20, '#ffd9b3');
-				ctx.fillStyle = '#2e2a26';
-				ctx.beginPath();
-				ctx.arc(cx, 250, 20, Math.PI * 1.02, Math.PI * 1.98);
-				ctx.fill();
-				roundDot(ctx, cx - 7, 249, 2.6, '#333');
-				roundDot(ctx, cx + 7, 249, 2.6, '#333');
-				ctx.strokeStyle = '#ef7d54';
-				ctx.lineWidth = 8;
-				ctx.beginPath();
-				ctx.moveTo(cx - 18, 276);
-				ctx.lineTo(cx - 40, 262);
-				ctx.moveTo(cx + 18, 276);
-				ctx.lineTo(cx + 40, 258);
-				ctx.stroke();
-			}
-		}
+		name: '毛巾',
+		bbox: { x: 288, y: 180, w: 60, h: 72 }
 	},
 	{
-		name: '树木',
-		bbox: { x: 290, y: 180, w: 110, h: 140 },
-		paint(ctx, v) {
-			const few = v === 1;
-			const trees = few
-				? [[330, 250, 0.8]]
-				: [
-						[320, 250, 0.9],
-						[360, 240, 1],
-						[388, 260, 0.7]
-					];
-			trees.forEach((t) => {
-				ctx.fillStyle = '#8a5a32';
-				ctx.fillRect(t[0] - 4, t[1], 8, 50 * t[2]);
-				ctx.fillStyle = '#5fae46';
-				circle(ctx, t[0], t[1] - 6, 24 * t[2]);
-				ctx.fill();
-				ctx.fillStyle = '#76c25a';
-				circle(ctx, t[0] - 10, t[1] - 16, 16 * t[2]);
-				ctx.fill();
-			});
-		}
+		name: '帽子',
+		bbox: { x: 112, y: 141, w: 64, h: 40, angle: -46 }
 	},
 	{
-		name: '同伴',
-		bbox: { x: 240, y: 280, w: 70, h: 90 },
-		paint(ctx, v) {
-			if (v === 1) return;
-			const cx = 268;
-			ctx.fillStyle = '#9b6dd6';
-			rr(ctx, cx - 16, 312, 32, 36, 12);
-			ctx.fill();
-			roundDot(ctx, cx, 300, 14, '#ffd9b3');
-			ctx.fillStyle = '#3a2a1d';
-			ctx.beginPath();
-			ctx.arc(cx, 300, 14, Math.PI * 1.02, Math.PI * 1.98);
-			ctx.fill();
-			roundDot(ctx, cx - 5, 299, 2, '#333');
-			roundDot(ctx, cx + 5, 299, 2, '#333');
-		}
+		name: '眼镜',
+		bbox: { x: 150, y: 166, w: 46, h: 30, angle: -32 }
 	},
 	{
-		name: '天色',
-		bbox: { x: 0, y: 0, w: 400, h: 300 },
-		paint(ctx, v) {
-			const dusk = v === 1;
-			const g = ctx.createLinearGradient(0, 0, 0, 300);
-			if (dusk) {
-				g.addColorStop(0, '#ff9e6d');
-				g.addColorStop(0.6, '#ffd1a1');
-				g.addColorStop(1, '#fff0d6');
-			} else {
-				g.addColorStop(0, '#7ec8f0');
-				g.addColorStop(1, '#cfeeff');
-			}
-			ctx.fillStyle = g;
-			ctx.fillRect(0, 0, 400, 300);
-		}
+		name: '水瓶',
+		bbox: { x: 80, y: 255, w: 23, h: 82 }
 	}
 ];
 
@@ -784,17 +499,15 @@ const sceneOutdoor: Scene = {
 	name: '户外活动',
 	desc: '每天户外活动 2 小时，自然光可预防近视；多在户外跑跳、看看远方。',
 	tip: '出门晒晒太阳，别总宅着。',
+	boardMode: 'stacked',
+	boardSize: outdoorStackLayout,
+	mapTapPoint: mapOutdoorTapPoint,
+	getTapBox: getOutdoorTapBox,
+	getMarkerPoints: getOutdoorMarkerPoints,
+	getDebugBoxes: getOutdoorDebugBoxes,
 	diffs: outdoorDiffs,
 	render(ctx, v) {
-		paintDiff(outdoorDiffs[4], ctx, v);
-		paintDiff(outdoorDiffs[0], ctx, v);
-		ctx.fillStyle = '#8fd06a';
-		ctx.fillRect(0, 300, 400, 100);
-		ctx.fillStyle = '#79bd57';
-		ctx.fillRect(0, 300, 400, 8);
-		paintDiff(outdoorDiffs[2], ctx, v);
-		paintDiff(outdoorDiffs[1], ctx, v);
-		paintDiff(outdoorDiffs[3], ctx, v);
+		drawOutdoorPhoto(ctx);
 	}
 };
 

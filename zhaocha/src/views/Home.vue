@@ -3,14 +3,14 @@
 		<div class="card">
 			<div class="logo">👀</div>
 			<h1>大家来找茬<span>· 护眼版</span></h1>
-			<p class="sub">5 个用眼场景，每关限时 60 秒，<br />找出全部差异即可通关，解锁护眼小课堂！</p>
+			<p class="sub">5 个用眼场景，每关限时 60 秒，<br />找出全部差异即可通关！</p>
 
 			<ul class="rule">
-				<li>✍ 读写姿势</li>
+				<!-- <li>✍ 读写姿势</li>
 				<li>💡 光线环境</li>
 				<li>⏱️ 用眼时长</li>
 				<li>🖥️ 屏幕距离</li>
-				<li>🌳 户外活动</li>
+				<li>🌳 户外活动</li> -->
 			</ul>
 
 			<van-cell-group inset v-if="store.best > 0" class="best">
@@ -19,7 +19,7 @@
 			</van-cell-group>
 
 			<van-button type="primary" block round size="large" @click="start">开始游戏</van-button>
-			<p class="hint-note">提示：当前画面为程序化占位图，后续可替换为真实美术。</p>
+			<!-- <p class="hint-note">提示：</p> -->
 		</div>
 	</div>
 </template>
