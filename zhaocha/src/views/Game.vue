@@ -29,27 +29,36 @@
 
 		<div class="controls">
 			<van-button plain type="primary" block @click="useHint">💡 提示</van-button>
-			<van-button plain type="default" block @click="retry">↻ 重玩</van-button>
+			<van-button plain type="default" block @click="retry">↻ 重玩本关</van-button>
 		</div>
 
 		<!-- 护眼小课堂 -->
 		<van-dialog
 			v-model:show="showLesson"
-			:title="lessonTitle"
-			confirm-button-text="进入下一关"
+			:title="lessonDialogTitle"
+			:confirm-button-text="lessonDialogConfirmText"
 			@confirm="nextAfterLesson"
 		>
 			<div class="lesson">
-				<div class="lesson-illus">🖼️<br /><span>科普图文占位</span></div>
-				<p class="lesson-desc">{{ scene.desc }}</p>
+				<div v-if="lessonDialogImage" class="lesson-illus lesson-illus-image">
+					<img :src="lessonDialogImage" :alt="`${lessonDialogSceneName} 科普图`" />
+				</div>
+				<div v-else class="lesson-illus">🖼️<br /><span>科普图文占位</span></div>
+				<p class="lesson-desc">{{ lessonDialogDesc }}</p>
 				<ul class="lesson-tips">
-					<li v-for="(t, i) in lessonTips" :key="i">{{ t }}</li>
+					<li v-for="(t, i) in lessonDialogTips" :key="i">{{ t }}</li>
 				</ul>
 			</div>
 		</van-dialog>
 
 		<!-- 失败 -->
-		<van-dialog v-model:show="showFail" title="⏰ 时间到" confirm-button-text="重玩本关" @confirm="retry">
+		<van-dialog v-model:show="showFail" confirm-button-text="重玩本关" @confirm="retry">
+			<template #title>
+				<span class="dialog-title-with-icon">
+					<van-icon name="underway-o" />
+					<span>时间到</span>
+				</span>
+			</template>
 			<div class="fail">
 				<p>还有差异没找到，再试一次吧！</p>
 			</div>
@@ -60,7 +69,7 @@
 <script setup lang="ts">
 import { ref, computed, nextTick, onMounted, onUnmounted } from 'vue';
 import { useRouter } from 'vue-router';
-import { Button as VanButton, Dialog as VanDialog, showToast } from 'vant';
+import { Button as VanButton, Dialog as VanDialog, Icon as VanIcon } from 'vant';
 import { SCENES, PLACEHOLDER_TIPS } from '../game/scenes';
 import { useGameStore, TOTAL_LEVELS } from '../store/game';
 
@@ -78,6 +87,8 @@ const FEEDBACK_LABEL_DURATION = 1100;
 const FEEDBACK_LABEL_FADE_IN_DURATION = 220;
 const FEEDBACK_LABEL_FADE_OUT_DURATION = 360;
 const FEEDBACK_LABEL_RISE = 18;
+const LEVEL_CLEAR_DELAY = 1300;
+const LEVEL_CLEAR_BURST_DURATION = 1120;
 const router = useRouter();
 const store = useGameStore();
 
@@ -95,9 +106,29 @@ const wrongTapMark = ref<{ x: number; y: number; variant: number } | null>(null)
 const feedbackLabels = ref<
 	Array<{ x: number; y: number; text: string; color: string; variant: number | null; startedAt: number }>
 >([]);
+const clearBursts = ref<
+	Array<{
+		x: number;
+		y: number;
+		vx: number;
+		vy: number;
+		size: number;
+		rotation: number;
+		spin: number;
+		color: string;
+		variant: number | null;
+		startedAt: number;
+	}>
+>([]);
 const running = ref(false);
 const showLesson = ref(false);
 const showFail = ref(false);
+const lessonDialogTitle = ref('');
+const lessonDialogConfirmText = ref('进入下一关');
+const lessonDialogSceneName = ref('');
+const lessonDialogDesc = ref('');
+const lessonDialogImage = ref('');
+const lessonDialogTips = ref<string[]>([]);
 
 let timerId: number | null = null;
 let hintTimer: number | null = null;
@@ -105,13 +136,12 @@ let wrongTapTimer: number | null = null;
 let hintFrameId: number | null = null;
 let feedbackFrameId: number | null = null;
 let boardsResizeObserver: ResizeObserver | null = null;
+let lessonTimerId: number | null = null;
 let hintStartedAt = 0;
 let lastWrongTapAt = 0;
 
 const totalLevels = TOTAL_LEVELS;
 const scene = computed(() => SCENES[levelIndex.value]);
-const lessonTitle = computed(() => `护眼小课堂 · ${scene.value.name}`);
-const lessonTips = computed(() => PLACEHOLDER_TIPS[scene.value.name] || ['（科普图文占位）保持良好用眼习惯。']);
 const isLast = computed(() => levelIndex.value + 1 >= SCENES.length);
 const isStackedBoard = computed(() => scene.value.boardMode === 'stacked');
 const boardSize = computed(() => scene.value.boardSize || { width: S, height: S });
@@ -161,6 +191,9 @@ function easeOutCubic(t: number) {
 function easeInCubic(t: number) {
 	return t * t * t;
 }
+function easeOutQuad(t: number) {
+	return 1 - (1 - t) * (1 - t);
+}
 function drawFeedbackLabel(
 	ctx: CanvasRenderingContext2D,
 	p: { x: number; y: number },
@@ -184,10 +217,16 @@ function drawFeedbackLabel(
 	ctx.fillText(text, 0, 0);
 	ctx.restore();
 }
-function drawMarker(ctx: CanvasRenderingContext2D, p: { x: number; y: number }, color: string, pulse = false) {
+function drawMarker(
+	ctx: CanvasRenderingContext2D,
+	p: { x: number; y: number; radius?: number },
+	color: string,
+	pulse = false
+) {
 	ctx.save();
 	const now = performance.now();
-	let radius = 20;
+	const baseRadius = p.radius ?? 20;
+	let radius = baseRadius;
 	let alpha = 1;
 	if (pulse) {
 		const elapsed = now - hintStartedAt;
@@ -196,7 +235,7 @@ function drawMarker(ctx: CanvasRenderingContext2D, p: { x: number; y: number }, 
 		const fadeOut = Math.min(1, remain / HINT_FADE_DURATION);
 		const visibility = easeInOut(Math.min(fadeIn, fadeOut));
 		const breath = (Math.sin(now / 260) + 1) / 2;
-		radius = 18 + breath * 8;
+		radius = Math.max(12, baseRadius - 4) + breath * 8;
 		alpha = visibility * (0.45 + breath * 0.55);
 	}
 	ctx.globalAlpha = alpha;
@@ -274,6 +313,48 @@ function drawWrongMark(ctx: CanvasRenderingContext2D, p: { x: number; y: number 
 	ctx.stroke();
 	ctx.restore();
 }
+function drawStar(ctx: CanvasRenderingContext2D, size: number) {
+	const innerRadius = size * 0.45;
+	ctx.beginPath();
+	for (let i = 0; i < 10; i++) {
+		const angle = -Math.PI / 2 + (i * Math.PI) / 5;
+		const radius = i % 2 === 0 ? size : innerRadius;
+		const px = Math.cos(angle) * radius;
+		const py = Math.sin(angle) * radius;
+		if (i === 0) {
+			ctx.moveTo(px, py);
+		} else {
+			ctx.lineTo(px, py);
+		}
+	}
+	ctx.closePath();
+}
+function enqueueLevelClearBurst() {
+	const startedAt = performance.now();
+	const origin = {
+		x: boardSize.value.width / 2,
+		y: boardSize.value.height / 2
+	};
+	const colors = ['#ffd54f', '#fff176', '#ffecb3', '#81d4fa', '#a5d6a7'];
+	const particles = Array.from({ length: 12 }, (_, i) => {
+		const angle = -Math.PI / 2 + (i / 12) * Math.PI * 2;
+		const speed = 72 + (i % 4) * 6;
+		return {
+			x: origin.x,
+			y: origin.y,
+			vx: Math.cos(angle) * speed,
+			vy: Math.sin(angle) * speed,
+			size: 12 + (i % 3) * 2,
+			rotation: (i / 12) * Math.PI,
+			spin: (i % 2 === 0 ? 1 : -1) * (1.4 + (i % 3) * 0.35),
+			color: colors[i % colors.length],
+			variant: isStackedBoard.value ? 0 : null,
+			startedAt
+		};
+	});
+	clearBursts.value = [...clearBursts.value, ...particles];
+	startFeedbackAnimation();
+}
 function enqueueFeedbackLabel(
 	points: Array<{ x: number; y: number }>,
 	text: string,
@@ -287,8 +368,10 @@ function enqueueFeedbackLabel(
 	];
 	startFeedbackAnimation();
 }
+
 function pruneFeedbackLabels(now = performance.now()) {
 	feedbackLabels.value = feedbackLabels.value.filter((label) => now - label.startedAt < FEEDBACK_LABEL_DURATION);
+	clearBursts.value = clearBursts.value.filter((burst) => now - burst.startedAt < LEVEL_CLEAR_BURST_DURATION);
 }
 function drawAnimatedFeedbackLabels(ctx: CanvasRenderingContext2D, variant: number) {
 	const now = performance.now();
@@ -306,6 +389,31 @@ function drawAnimatedFeedbackLabels(ctx: CanvasRenderingContext2D, variant: numb
 		const offsetY = 12 - moveProgress * FEEDBACK_LABEL_RISE;
 		const scale = easeOutCubic(fadeInProgress);
 		drawFeedbackLabel(ctx, label, label.text, label.color, visibility, offsetY, scale);
+	});
+}
+function drawLevelClearBursts(ctx: CanvasRenderingContext2D, variant: number) {
+	const now = performance.now();
+	clearBursts.value.forEach((burst) => {
+		if (burst.variant !== null && burst.variant !== variant) return;
+		const elapsed = now - burst.startedAt;
+		if (elapsed >= LEVEL_CLEAR_BURST_DURATION) return;
+		const progress = elapsed / LEVEL_CLEAR_BURST_DURATION;
+		const eased = easeOutQuad(progress);
+		const alpha = 1 - easeInCubic(progress);
+		const scale = 0.7 + (1 - progress) * 0.55;
+		const x = burst.x + burst.vx * eased;
+		const y = burst.y + burst.vy * eased - progress * 8;
+		ctx.save();
+		ctx.globalAlpha = alpha;
+		ctx.translate(x, y);
+		ctx.rotate(burst.rotation + burst.spin * progress);
+		ctx.fillStyle = burst.color;
+		ctx.strokeStyle = 'rgba(255,255,255,0.95)';
+		ctx.lineWidth = 2;
+		drawStar(ctx, burst.size * scale);
+		ctx.fill();
+		ctx.stroke();
+		ctx.restore();
 	});
 }
 function isPointInTapBox(
@@ -340,7 +448,7 @@ function isPointInTapBox(
 }
 function getMarkerPoints(index: number) {
 	const diff = scene.value.diffs[index];
-	return scene.value.getMarkerPoints ? scene.value.getMarkerPoints(diff) : [center(diff.bbox)];
+	return scene.value.getMarkerPoints ? scene.value.getMarkerPoints(diff) : [diff.marker || center(diff.bbox)];
 }
 function getDebugBoxes(index: number) {
 	const diff = scene.value.diffs[index];
@@ -374,6 +482,7 @@ function paintCanvas(ctx: CanvasRenderingContext2D, variant: number) {
 	if (wrongTapMark.value && wrongTapMark.value.variant === variant) {
 		drawWrongMark(ctx, wrongTapMark.value);
 	}
+	drawLevelClearBursts(ctx, variant);
 	drawAnimatedFeedbackLabels(ctx, variant);
 }
 function syncCanvasSize() {
@@ -423,7 +532,7 @@ function startFeedbackAnimation() {
 	stopFeedbackAnimation();
 	const tick = () => {
 		pruneFeedbackLabels();
-		if (!feedbackLabels.value.length) {
+		if (!feedbackLabels.value.length && !clearBursts.value.length) {
 			feedbackFrameId = null;
 			repaint();
 			return;
@@ -442,6 +551,13 @@ function stopFeedbackAnimation() {
 function clearFeedbackLabels() {
 	stopFeedbackAnimation();
 	feedbackLabels.value = [];
+	clearBursts.value = [];
+}
+function clearLessonTimer() {
+	if (lessonTimerId) {
+		clearTimeout(lessonTimerId);
+		lessonTimerId = null;
+	}
 }
 function clearWrongTapMark() {
 	if (wrongTapTimer) {
@@ -462,6 +578,7 @@ async function loadLevel(i: number) {
 	hintsUsed.value = 0;
 	hintIndex.value = -1;
 	clearFeedbackLabels();
+	clearLessonTimer();
 	clearWrongTapMark();
 	running.value = true;
 	repaint();
@@ -563,11 +680,28 @@ function completeLevel() {
 	running.value = false;
 	stopTimer();
 	clearHint();
+	clearLessonTimer();
 	const base = Math.round((100 * timeLeft.value) / 60);
 	const score = Math.max(0, Math.min(100, base - hintsUsed.value * 8));
 	store.setScore(levelIndex.value, score);
 	beep(1320, 0.12);
-	showLesson.value = true;
+	lessonDialogSceneName.value = scene.value.name;
+	lessonDialogTitle.value = `护眼小课堂 · ${scene.value.name}`;
+	lessonDialogConfirmText.value = isLast.value ? '查看结果' : '进入下一关';
+	lessonDialogDesc.value = scene.value.desc;
+	lessonDialogImage.value = scene.value.lessonImage || '';
+	lessonDialogTips.value = PLACEHOLDER_TIPS[scene.value.name] || ['（科普图文占位）保持良好用眼习惯。'];
+	enqueueLevelClearBurst();
+	// enqueueFeedbackLabel(
+	// 	[{ x: boardSize.value.width / 2, y: boardSize.value.height / 2 - 6 }],
+	// 	`恭喜通过第 ${levelIndex.value + 1} 关`,
+	// 	'#ffb300',
+	// 	isStackedBoard.value ? 0 : null
+	// );
+	lessonTimerId = window.setTimeout(() => {
+		showLesson.value = true;
+		lessonTimerId = null;
+	}, LEVEL_CLEAR_DELAY);
 }
 function failLevel() {
 	running.value = false;
@@ -625,6 +759,7 @@ onUnmounted(() => {
 	stopTimer();
 	clearHint();
 	clearFeedbackLabels();
+	clearLessonTimer();
 	clearWrongTapMark();
 });
 </script>
@@ -718,10 +853,18 @@ onUnmounted(() => {
 .controls :deep(.van-button) {
 	flex: 1;
 }
+.dialog-title-with-icon {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+}
 .lesson,
 .fail {
-	padding: 4px 6px 8px;
+	padding: 12px 6px 8px;
 	text-align: left;
+}
+.fail {
+	text-align: center;
 }
 .lesson-illus {
 	background: linear-gradient(135deg, #eaf2ff, #fdf3e7);
@@ -738,6 +881,16 @@ onUnmounted(() => {
 	font-size: 12px;
 	margin-top: 6px;
 }
+.lesson-illus-image {
+	padding: 0;
+	overflow: hidden;
+}
+.lesson-illus-image img {
+	display: block;
+	width: 100%;
+	height: auto;
+	border-radius: 12px;
+}
 .lesson-desc {
 	font-size: 14px;
 	color: #455;
@@ -750,17 +903,18 @@ onUnmounted(() => {
 .lesson-tips {
 	list-style: none;
 	margin: 0;
-	padding: 0;
+	padding: 0 0 0 8px;
 }
 .lesson-tips li {
-	font-size: 14px;
-	padding: 8px 0 8px 24px;
 	position: relative;
+	padding: 8px 0 8px 15px;
 	border-bottom: 1px dashed #eee;
+	font-size: 14px;
 }
 .lesson-tips li::before {
-	content: '✅';
+	content: '•';
 	position: absolute;
 	left: 0;
+	color: #4f5d75;
 }
 </style>

@@ -11,11 +11,16 @@
  *   - diff.paint(ctx, variant)：绘制该处差异元素（0/1 两种状态）。
  * ===========================================================================*/
 import posturePhotoUrl from '../assets/duxiezishi.png';
+import postureLessonImageUrl from '../assets/duxiezishi-result.png';
 import lightPhotoUrl from '../assets/guangxianhuanjing.png';
+import lightLessonImageUrl from '../assets/guangxianhuanjing-result.png';
 import durationPhotoUrl from '../assets/yongyanshichang.png';
+import durationLessonImageUrl from '../assets/yongyanshichang-result.png';
 import screenPhotoUrl from '../assets/yongyanjuli.png';
+import screenLessonImageUrl from '../assets/yongyanjuli-result.png';
 import outdoorPhotoUrl from '../assets/huwaiyundong.png';
-import { S, type Diff, type DiffBox, type Point, type Scene } from './types';
+import outdoorLessonImageUrl from '../assets/huwaiyundong-result.png';
+import { S, type Diff, type DiffBox, type MarkerPoint, type Point, type Scene } from './types';
 
 const posturePhoto = typeof Image === 'undefined' ? null : new Image();
 const lightPhoto = typeof Image === 'undefined' ? null : new Image();
@@ -54,78 +59,6 @@ if (outdoorPhoto) {
 	});
 }
 
-/* ----------------------------- 通用绘制工具 ----------------------------- */
-function rr(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
-	ctx.beginPath();
-	ctx.moveTo(x + r, y);
-	ctx.arcTo(x + w, y, x + w, y + h, r);
-	ctx.arcTo(x + w, y + h, x, y + h, r);
-	ctx.arcTo(x, y + h, x, y, r);
-	ctx.arcTo(x, y, x + w, y, r);
-	ctx.closePath();
-}
-function circle(ctx: CanvasRenderingContext2D, x: number, y: number, r: number) {
-	ctx.beginPath();
-	ctx.arc(x, y, r, 0, Math.PI * 2);
-	ctx.closePath();
-}
-function roundDot(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, color: string) {
-	ctx.fillStyle = color;
-	circle(ctx, x, y, r);
-	ctx.fill();
-}
-function text(
-	ctx: CanvasRenderingContext2D,
-	str: string,
-	x: number,
-	y: number,
-	size: number,
-	color: string,
-	align: CanvasTextAlign = 'center'
-) {
-	ctx.fillStyle = color;
-	ctx.font = `bold ${size}px "PingFang SC","Microsoft YaHei",sans-serif`;
-	ctx.textAlign = align;
-	ctx.textBaseline = 'middle';
-	ctx.fillText(str, x, y);
-}
-function paintDiff(diff: Diff, ctx: CanvasRenderingContext2D, variant: number) {
-	diff.paint?.(ctx, variant);
-}
-/* 简易房间背景（墙 + 地板 + 左窗） */
-function drawRoom(ctx: CanvasRenderingContext2D, wall1: string, wall2: string, floor: string) {
-	const g = ctx.createLinearGradient(0, 0, 0, 300);
-	g.addColorStop(0, wall1);
-	g.addColorStop(1, wall2);
-	ctx.fillStyle = g;
-	ctx.fillRect(0, 0, 400, 300);
-	ctx.fillStyle = floor;
-	ctx.fillRect(0, 300, 400, 100);
-	ctx.fillStyle = 'rgba(0,0,0,0.08)';
-	ctx.fillRect(0, 300, 400, 5);
-	ctx.fillStyle = '#bfe3f2';
-	rr(ctx, 28, 48, 104, 124, 8);
-	ctx.fill();
-	ctx.strokeStyle = '#ffffff';
-	ctx.lineWidth = 5;
-	rr(ctx, 28, 48, 104, 124, 8);
-	ctx.stroke();
-	ctx.beginPath();
-	ctx.moveTo(80, 48);
-	ctx.lineTo(80, 172);
-	ctx.moveTo(28, 110);
-	ctx.lineTo(132, 110);
-	ctx.stroke();
-}
-/* 书桌（通用） */
-function drawDesk(ctx: CanvasRenderingContext2D, x: number, y: number, w: number) {
-	ctx.fillStyle = '#caa06a';
-	rr(ctx, x, y, w, 16, 4);
-	ctx.fill();
-	ctx.fillStyle = '#a87f4d';
-	ctx.fillRect(x + 10, y + 16, 12, 84);
-	ctx.fillRect(x + w - 22, y + 16, 12, 84);
-}
 function drawStackedPhoto(
 	ctx: CanvasRenderingContext2D,
 	image: HTMLImageElement | null,
@@ -233,30 +166,40 @@ function getOutdoorTapBox(diff: Diff, point: Point): DiffBox {
 	return getStackedTapBox(diff, point, outdoorStackLayout);
 }
 
-function getStackedMarkerPoints(diff: Diff, layout: { topY: number; panelHeight: number }): Point[] {
+function getStackedMarkerPoints(diff: Diff, layout: { topY: number; panelHeight: number }): MarkerPoint[] {
 	const topBox = diff.bbox;
 	const bottomBox = diff.bottomBox || diff.bbox;
 	const secondPanelY = layout.topY + layout.panelHeight;
-	const topY = ((topBox.y + topBox.h / 2) / S) * layout.panelHeight;
-	const bottomY = ((bottomBox.y + bottomBox.h / 2) / S) * layout.panelHeight;
+	const topMarker = diff.marker || { x: topBox.x + topBox.w / 2, y: topBox.y + topBox.h / 2 };
+	const bottomMarker = diff.bottomMarker ||
+		diff.marker || { x: bottomBox.x + bottomBox.w / 2, y: bottomBox.y + bottomBox.h / 2 };
+	const scale = layout.panelHeight / S;
 	return [
-		{ x: topBox.x + topBox.w / 2, y: layout.topY + topY },
-		{ x: bottomBox.x + bottomBox.w / 2, y: secondPanelY + bottomY }
+		{
+			x: topMarker.x,
+			y: layout.topY + topMarker.y * scale,
+			radius: topMarker.radius ? topMarker.radius * scale : undefined
+		},
+		{
+			x: bottomMarker.x,
+			y: secondPanelY + bottomMarker.y * scale,
+			radius: bottomMarker.radius ? bottomMarker.radius * scale : undefined
+		}
 	];
 }
-function getPostureMarkerPoints(diff: Diff): Point[] {
+function getPostureMarkerPoints(diff: Diff): MarkerPoint[] {
 	return getStackedMarkerPoints(diff, postureStackLayout);
 }
-function getLightMarkerPoints(diff: Diff): Point[] {
+function getLightMarkerPoints(diff: Diff): MarkerPoint[] {
 	return getStackedMarkerPoints(diff, lightStackLayout);
 }
-function getDurationMarkerPoints(diff: Diff): Point[] {
+function getDurationMarkerPoints(diff: Diff): MarkerPoint[] {
 	return getStackedMarkerPoints(diff, durationStackLayout);
 }
-function getScreenMarkerPoints(diff: Diff): Point[] {
+function getScreenMarkerPoints(diff: Diff): MarkerPoint[] {
 	return getStackedMarkerPoints(diff, screenStackLayout);
 }
-function getOutdoorMarkerPoints(diff: Diff): Point[] {
+function getOutdoorMarkerPoints(diff: Diff): MarkerPoint[] {
 	return getStackedMarkerPoints(diff, outdoorStackLayout);
 }
 function getStackedDebugBoxes(diff: Diff, layout: { topY: number; panelHeight: number }): DiffBox[] {
@@ -308,16 +251,18 @@ const postureDiffs: Diff[] = [
 	},
 	{
 		name: '书本距离',
-		bbox: { x: 130, y: 135, w: 72, h: 52 }
+		bbox: { x: 145, y: 55, w: 100, h: 125 },
+		marker: { x: 175, y: 133, radius: 50 }
 	},
 	{
 		name: '台灯',
-		bbox: { x: 72, y: 75, w: 74, h: 118 }
+		bbox: { x: 72, y: 75, w: 74, h: 118 },
+		marker: { x: 109, y: 160, radius: 30 }
 	},
 	{
 		name: '窗帘',
-		bbox: { x: 50, y: 6, w: 76, h: 132 },
-		bottomBox: { x: 25, y: 6, w: 150, h: 132 }
+		bbox: { x: 25, y: 6, w: 150, h: 132 },
+		marker: { x: 100, y: 68, radius: 52 }
 	},
 	{
 		name: '腿',
@@ -329,6 +274,7 @@ const scenePosture: Scene = {
 	name: '读写姿势',
 	desc: '保持「一尺一拳一寸」：眼离书本一尺、胸离桌边一拳、手离笔尖一寸。',
 	tip: '坐端正，不趴桌、不歪头。',
+	lessonImage: postureLessonImageUrl,
 	boardMode: 'stacked',
 	boardSize: postureStackLayout,
 	mapTapPoint: mapPostureTapPoint,
@@ -347,7 +293,9 @@ const scenePosture: Scene = {
 const lightDiffs: Diff[] = [
 	{
 		name: '头顶灯',
-		bbox: { x: 160, y: 3, w: 79, h: 26 }
+		bbox: { x: 160, y: 3, w: 79, h: 26 },
+		marker: { x: 199.5, y: 24, radius: 20 },
+		bottomMarker: { x: 199.5, y: 16, radius: 20 }
 	},
 	{
 		name: '台灯',
@@ -371,6 +319,7 @@ const sceneLight: Scene = {
 	name: '光线环境',
 	desc: '读写要在充足、均匀的光线下进行；光线应从左上方来，避免眩光与阴影。',
 	tip: '开主灯 + 台灯，屏幕避开反光。',
+	lessonImage: lightLessonImageUrl,
 	boardMode: 'stacked',
 	boardSize: lightStackLayout,
 	mapTapPoint: mapLightTapPoint,
@@ -393,15 +342,18 @@ const durationDiffs: Diff[] = [
 	},
 	{
 		name: '休息提示牌',
-		bbox: { x: 339, y: 220, w: 40, h: 28 }
+		bbox: { x: 339, y: 220, w: 40, h: 28 },
+		marker: { x: 359, y: 234, radius: 19 }
 	},
 	{
 		name: '盆栽',
-		bbox: { x: 380, y: 198, w: 19, h: 43 }
+		bbox: { x: 380, y: 198, w: 19, h: 43 },
+		marker: { x: 389.5, y: 221.5, radius: 12 }
 	},
 	{
 		name: '眼睛状态',
-		bbox: { x: 112, y: 154, w: 18, h: 28 }
+		bbox: { x: 112, y: 154, w: 18, h: 28 },
+		marker: { x: 121, y: 168, radius: 17 }
 	},
 	{
 		name: '水杯',
@@ -413,6 +365,7 @@ const sceneDuration: Scene = {
 	name: '用眼时长',
 	desc: '近距离用眼 20~30 分钟，就远眺 20 秒（20-20-20 法则），让眼睛休息。',
 	tip: '定时休息，别连续苦读两小时。',
+	lessonImage: durationLessonImageUrl,
 	boardMode: 'stacked',
 	boardSize: durationStackLayout,
 	mapTapPoint: mapDurationTapPoint,
@@ -432,16 +385,21 @@ const screenDiffs: Diff[] = [
 	{
 		name: '手臂',
 		bbox: { x: 110, y: 140, w: 60, h: 68 },
-		bottomBox: { x: 110, y: 140, w: 50, h: 68 }
+		bottomBox: { x: 110, y: 140, w: 50, h: 68 },
+		marker: { x: 140, y: 179, radius: 32 },
+		bottomMarker: { x: 135, y: 179, radius: 32 }
 	},
 	{
 		name: '手机挂饰',
 		bbox: { x: 185, y: 130, w: 20, h: 30 },
-		bottomBox: { x: 165, y: 135, w: 15, h: 30 }
+		bottomBox: { x: 165, y: 135, w: 15, h: 30 },
+		marker: { x: 195, y: 145, radius: 16 },
+		bottomMarker: { x: 172.5, y: 150, radius: 16 }
 	},
 	{
 		name: '眼镜',
-		bbox: { x: 120, y: 105, w: 30, h: 30 }
+		bbox: { x: 120, y: 105, w: 30, h: 30 },
+		marker: { x: 135, y: 120, radius: 18 }
 	},
 	{
 		name: '抱枕',
@@ -457,6 +415,7 @@ const sceneScreen: Scene = {
 	name: '屏幕距离',
 	desc: '看屏幕保持一臂距离（约 50~70cm），屏幕顶端与视线平齐，并开启护眼模式。',
 	tip: '屏幕别凑太近，开护眼滤蓝光。',
+	lessonImage: screenLessonImageUrl,
 	boardMode: 'stacked',
 	boardSize: screenStackLayout,
 	mapTapPoint: mapScreenTapPoint,
@@ -483,11 +442,13 @@ const outdoorDiffs: Diff[] = [
 	},
 	{
 		name: '帽子',
-		bbox: { x: 112, y: 141, w: 64, h: 40, angle: -46 }
+		bbox: { x: 112, y: 141, w: 64, h: 40, angle: -46 },
+		marker: { x: 138, y: 151, radius: 27 }
 	},
 	{
 		name: '眼镜',
-		bbox: { x: 150, y: 166, w: 46, h: 30, angle: -32 }
+		bbox: { x: 150, y: 166, w: 46, h: 30, angle: -32 },
+		marker: { x: 173, y: 181, radius: 21 }
 	},
 	{
 		name: '水瓶',
@@ -499,6 +460,7 @@ const sceneOutdoor: Scene = {
 	name: '户外活动',
 	desc: '每天户外活动 2 小时，自然光可预防近视；多在户外跑跳、看看远方。',
 	tip: '出门晒晒太阳，别总宅着。',
+	lessonImage: outdoorLessonImageUrl,
 	boardMode: 'stacked',
 	boardSize: outdoorStackLayout,
 	mapTapPoint: mapOutdoorTapPoint,
@@ -515,23 +477,11 @@ const sceneOutdoor: Scene = {
 export const SCENES: Scene[] = [scenePosture, sceneLight, sceneDuration, sceneScreen, sceneOutdoor];
 
 export const PLACEHOLDER_TIPS: Record<string, string[]> = {
-	读写姿势: [
-		'（科普图文占位）眼离书本约 33cm（一尺）。',
-		'胸口离桌沿一拳，握笔离笔尖一寸。',
-		'不趴桌、不歪头，脊柱保持自然直立。'
-	],
-	光线环境: [
-		'（科普图文占位）主灯 + 台灯双光源更均匀。',
-		'光线从左上方来，避免手部阴影。',
-		'屏幕避开窗户反光，可拉上遮光帘。'
-	],
-	用眼时长: ['（科普图文占位）遵循 20-20-20 法则。', '近距离用眼 20~30 分钟远眺 20 秒。', '连续用眼不超过 1 小时。'],
-	屏幕距离: [
-		'（科普图文占位）屏幕距离一臂（50~70cm）。',
-		'屏幕顶端与视线平齐，略向下看。',
-		'开启护眼/滤蓝光模式，亮度随环境。'
-	],
-	户外活动: ['（科普图文占位）每天户外 2 小时。', '自然光有助于延缓近视发展。', '多望远、多跑跳，放松睫状肌。']
+	读写姿势: ['眼离书本约 33cm（一尺）。', '胸口离桌沿一拳，握笔离笔尖一寸。', '不趴桌、不歪头，脊柱保持自然直立。'],
+	光线环境: ['主灯 + 台灯双光源更均匀。', '光线从左上方来，避免手部阴影。', '屏幕避开窗户反光，可拉上遮光帘。'],
+	用眼时长: ['遵循 20-20-20 法则。', '近距离用眼 20~30 分钟远眺 20 秒。', '连续用眼不超过 1 小时。'],
+	屏幕距离: ['屏幕距离一臂（50~70cm）。', '屏幕顶端与视线平齐，略向下看。', '开启护眼/滤蓝光模式，亮度随环境。'],
+	户外活动: ['每天户外 2 小时。', '自然光有助于延缓近视发展。', '多望远、多跑跳，放松睫状肌。']
 };
 
 export { S };
