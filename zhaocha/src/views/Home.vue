@@ -1,17 +1,11 @@
 <template>
 	<div class="page home">
 		<div class="card">
-			<div class="logo">👀</div>
-			<h1>大家来找茬<span>· 护眼版</span></h1>
+			<div class="logo">
+				<img :src="sunglassesLogoUrl" alt="大家来找茬 logo" />
+			</div>
+			<h1>大家来找茬</h1>
 			<p class="sub">5 个用眼场景，每关限时 60 秒，<br />找出全部差异即可通关！</p>
-
-			<ul class="rule">
-				<!-- <li>✍ 读写姿势</li>
-				<li>💡 光线环境</li>
-				<li>⏱️ 用眼时长</li>
-				<li>🖥️ 屏幕距离</li>
-				<li>🌳 户外活动</li> -->
-			</ul>
 
 			<van-cell-group inset v-if="store.best > 0" class="best">
 				<van-cell title="历史最佳评分" :value="store.best + ' 分'" />
@@ -28,6 +22,7 @@
 import { useRouter } from 'vue-router';
 import { Button as VanButton, Cell as VanCell, CellGroup as VanCellGroup } from 'vant';
 import { useGameStore } from '../store/game';
+import sunglassesLogoUrl from '../assets/sunglasses.png';
 
 const router = useRouter();
 const store = useGameStore();
@@ -55,34 +50,25 @@ function start() {
 	max-width: 420px;
 }
 .logo {
-	font-size: 56px;
+	display: flex;
+	justify-content: center;
+	margin-bottom: 6px;
+}
+.logo img {
+	display: block;
+	width: 88px;
+	height: 88px;
+	object-fit: contain;
 }
 h1 {
 	font-size: 26px;
 	margin: 8px 0;
-}
-h1 span {
-	color: var(--blue);
-	font-size: 18px;
 }
 .sub {
 	color: var(--muted);
 	font-size: 14px;
 	line-height: 1.7;
 	margin: 10px 0 16px;
-}
-.rule {
-	list-style: none;
-	display: grid;
-	grid-template-columns: 1fr 1fr;
-	gap: 8px;
-	margin: 12px 0 20px;
-}
-.rule li {
-	background: #f1f5fb;
-	border-radius: 12px;
-	padding: 10px;
-	font-size: 14px;
 }
 .best {
 	margin-bottom: 16px;

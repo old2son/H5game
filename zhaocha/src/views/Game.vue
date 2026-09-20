@@ -28,13 +28,24 @@
 		</div>
 
 		<div class="controls">
-			<van-button plain type="primary" block @click="useHint">💡 提示</van-button>
-			<van-button plain type="default" block @click="retry">↻ 重玩本关</van-button>
+			<van-button plain type="primary" block @click="useHint">
+				<span class="control-button-content">
+					<img :src="tipsIconUrl" alt="" aria-hidden="true" />
+					<span>提示</span>
+				</span>
+			</van-button>
+			<van-button plain type="default" block @click="retry">
+				<span class="control-button-content">
+					<img :src="retryIconUrl" alt="" aria-hidden="true" />
+					<span>重玩本关</span>
+				</span>
+			</van-button>
 		</div>
 
 		<!-- 护眼小课堂 -->
 		<van-dialog
 			v-model:show="showLesson"
+			class="lesson-dialog"
 			:title="lessonDialogTitle"
 			:confirm-button-text="lessonDialogConfirmText"
 			@confirm="nextAfterLesson"
@@ -72,12 +83,16 @@ import { useRouter } from 'vue-router';
 import { Button as VanButton, Dialog as VanDialog, Icon as VanIcon } from 'vant';
 import { SCENES, PLACEHOLDER_TIPS } from '../game/scenes';
 import { useGameStore, TOTAL_LEVELS } from '../store/game';
+import tipsIconUrl from '../assets/tips.png';
+import retryIconUrl from '../assets/retry.png';
 
 const S = 400;
 // debug: 打开后会把当前关卡所有差异点圈出来，便于校准 bbox 坐标。
 const DEBUG_SHOW_DIFFS = false;
 // debug: 临时从第 2 关开始，便于跳过第一关直接测试。
 const DEBUG_START_LEVEL = 0;
+// debug: 当前关通关后直接跳转结果页，便于逐关测试结果页表现。
+const DEBUG_DIRECT_RESULT_AFTER_CLEAR = false;
 const BOARD_GAP = 10;
 const HINT_DURATION = 1400;
 const HINT_FADE_DURATION = 240;
@@ -685,6 +700,10 @@ function completeLevel() {
 	const score = Math.max(0, Math.min(100, base - hintsUsed.value * 8));
 	store.setScore(levelIndex.value, score);
 	beep(1320, 0.12);
+	if (DEBUG_DIRECT_RESULT_AFTER_CLEAR) {
+		router.push('/result');
+		return;
+	}
 	lessonDialogSceneName.value = scene.value.name;
 	lessonDialogTitle.value = `护眼小课堂 · ${scene.value.name}`;
 	lessonDialogConfirmText.value = isLast.value ? '查看结果' : '进入下一关';
@@ -853,10 +872,34 @@ onUnmounted(() => {
 .controls :deep(.van-button) {
 	flex: 1;
 }
+.control-button-content {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 6px;
+}
+.control-button-content img {
+	display: block;
+	width: 18px;
+	height: 18px;
+	object-fit: contain;
+}
 .dialog-title-with-icon {
 	display: inline-flex;
 	align-items: center;
 	gap: 6px;
+}
+:deep(.lesson-dialog) {
+	width: min(92vw, 520px);
+	max-height: min(88vh, 760px);
+	display: flex;
+	flex-direction: column;
+	overflow: hidden;
+}
+:deep(.lesson-dialog .van-dialog__content) {
+	flex: 1;
+	min-height: 0;
+	overflow-y: auto;
 }
 .lesson,
 .fail {
@@ -865,6 +908,11 @@ onUnmounted(() => {
 }
 .fail {
 	text-align: center;
+}
+.lesson {
+	max-height: min(62vh, 620px);
+	overflow-y: auto;
+	overscroll-behavior: contain;
 }
 .lesson-illus {
 	background: linear-gradient(135deg, #eaf2ff, #fdf3e7);
@@ -884,11 +932,17 @@ onUnmounted(() => {
 .lesson-illus-image {
 	padding: 0;
 	overflow: hidden;
+	width: min(100%, 280px);
+	aspect-ratio: 2 / 3;
+	margin-left: auto;
+	margin-right: auto;
+	background: #fff;
 }
 .lesson-illus-image img {
 	display: block;
 	width: 100%;
-	height: auto;
+	height: 100%;
+	object-fit: cover;
 	border-radius: 12px;
 }
 .lesson-desc {

@@ -1,13 +1,13 @@
 <template>
 	<div class="page result">
 		<div class="card">
-			<h2>🏆 全部通关！</h2>
+			<h2 class="result-title">
+				<img :src="smileIconUrl" alt="" aria-hidden="true" />
+				<span>全部通关！</span>
+			</h2>
 			<canvas ref="cert" class="cert"></canvas>
-			<p class="final-line">
-				你的用眼习惯健康评分：<b>{{ avg }}</b> 分（共 {{ totalLevels }} 关）
-			</p>
 			<div class="actions">
-				<van-button type="primary" block @click="save">💾 保存评分图片</van-button>
+				<van-button type="primary" block @click="save">保存评分图片</van-button>
 				<van-button plain type="default" block @click="again">再玩一次</van-button>
 			</div>
 		</div>
@@ -20,6 +20,7 @@ import { useRouter } from 'vue-router';
 import { Button as VanButton } from 'vant';
 import { SCENES } from '../game/scenes';
 import { useGameStore, TOTAL_LEVELS } from '../store/game';
+import smileIconUrl from '../assets/smile.png';
 
 const router = useRouter();
 const store = useGameStore();
@@ -43,12 +44,17 @@ function txt(
 	ctx.fillText(str, x, y);
 }
 function rr(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
+	const radius = Math.min(r, h / 2, w / 2);
+
 	ctx.beginPath();
-	ctx.moveTo(x + r, y);
-	ctx.arcTo(x + w, y, x + w, y + h, r);
-	ctx.arcTo(x + w, y + h, x, y + h, r);
-	ctx.arcTo(x, y + h, x, y, r);
-	ctx.arcTo(x, y, x + w, y, r);
+
+	ctx.moveTo(x + radius, y);
+
+	ctx.arcTo(x + w, y, x + w, y + h, radius);
+	ctx.arcTo(x + w, y + h, x, y + h, radius);
+	ctx.arcTo(x, y + h, x, y, radius);
+	ctx.arcTo(x, y, x + w, y, radius);
+
 	ctx.closePath();
 }
 
@@ -58,9 +64,6 @@ function drawCertificate(ctx: CanvasRenderingContext2D) {
 	g.addColorStop(1, '#fff7e6');
 	ctx.fillStyle = g;
 	ctx.fillRect(0, 0, 600, 840);
-	ctx.strokeStyle = '#5b8def';
-	ctx.lineWidth = 8;
-	ctx.strokeRect(24, 24, 552, 792);
 
 	txt(ctx, '用眼习惯健康评分', 300, 90, 34, '#2c3e50');
 	txt(ctx, 'EYE-CARE HEALTH REPORT', 300, 126, 14, '#8a9bb0');
@@ -90,10 +93,10 @@ function drawCertificate(ctx: CanvasRenderingContext2D) {
 		txt(ctx, `${i + 1}. ${s.name}`, 80, y + 22, 17, '#34495e', 'left');
 		const sc = store.scores[i] != null ? store.scores[i] : 0;
 		ctx.fillStyle = '#e3e9f2';
-		rr(ctx, 360, y + 10, 160, 24, 12);
+		rr(ctx, 350, y + 10, 160, 24, 12);
 		ctx.fill();
 		ctx.fillStyle = sc >= 80 ? '#2ecc71' : sc >= 60 ? '#f39c12' : '#e74c3c';
-		rr(ctx, 360, y + 10, (160 * sc) / 100, 24, 12);
+		rr(ctx, 350, y + 10, (160 * sc) / 100, 24, 12);
 		ctx.fill();
 		txt(ctx, String(sc), 528, y + 22, 15, '#34495e', 'right');
 	});
@@ -150,20 +153,24 @@ h2 {
 	font-size: 22px;
 	margin-bottom: 12px;
 }
+.result-title {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 8px;
+}
+.result-title img {
+	display: block;
+	width: 28px;
+	height: 28px;
+	object-fit: contain;
+}
 .cert {
 	width: 100%;
 	max-width: 320px;
 	border-radius: 12px;
 	box-shadow: 0 8px 24px rgba(60, 90, 160, 0.18);
 	margin: 4px auto 12px;
-}
-.final-line {
-	font-size: 15px;
-	margin-bottom: 12px;
-}
-.final-line b {
-	color: var(--blue);
-	font-size: 20px;
 }
 .actions {
 	display: flex;
