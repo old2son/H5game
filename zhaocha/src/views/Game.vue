@@ -50,7 +50,7 @@
 			:confirm-button-text="lessonDialogConfirmText"
 			@confirm="nextAfterLesson"
 		>
-			<div class="lesson">
+			<div ref="lessonContentRef" class="lesson">
 				<div v-if="lessonDialogImage" class="lesson-illus lesson-illus-image">
 					<img :src="lessonDialogImage" :alt="`${lessonDialogSceneName} 科普图`" />
 				</div>
@@ -78,10 +78,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, nextTick, onMounted, onUnmounted } from 'vue';
+import { ref, computed, nextTick, onMounted, onUnmounted, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { Button as VanButton, Dialog as VanDialog, Icon as VanIcon } from 'vant';
-import { SCENES, PLACEHOLDER_TIPS } from '../game/scenes';
+import { SCENES, PLACEHOLDER_TIPS, ensureSceneAssetsLoaded, preloadSceneAssets } from '../game/scenes';
 import { useGameStore, TOTAL_LEVELS } from '../store/game';
 import tipsIconUrl from '../assets/tips.png';
 import retryIconUrl from '../assets/retry.png';
@@ -111,6 +111,7 @@ const boardsRef = ref<HTMLDivElement | null>(null);
 const cvSingle = ref<HTMLCanvasElement | null>(null);
 const cv0 = ref<HTMLCanvasElement | null>(null);
 const cv1 = ref<HTMLCanvasElement | null>(null);
+const lessonContentRef = ref<HTMLDivElement | null>(null);
 
 const levelIndex = ref(0);
 const found = ref<number[]>([]);
@@ -525,6 +526,16 @@ function onSceneAssetsReady() {
 	repaint();
 }
 
+function resetLessonScroll() {
+	const lessonEl = lessonContentRef.value;
+	if (!lessonEl) return;
+	lessonEl.scrollTop = 0;
+	const dialogContentEl = lessonEl.closest('.van-dialog__content');
+	if (dialogContentEl instanceof HTMLElement) {
+		dialogContentEl.scrollTop = 0;
+	}
+}
+
 function startHintAnimation() {
 	stopHintAnimation();
 	const tick = () => {
@@ -584,6 +595,7 @@ function clearWrongTapMark() {
 
 /* ----------------------------- 关卡流程 ----------------------------- */
 async function loadLevel(i: number) {
+	running.value = false;
 	levelIndex.value = i;
 	await nextTick();
 	updateBoardArea();
@@ -595,9 +607,12 @@ async function loadLevel(i: number) {
 	clearFeedbackLabels();
 	clearLessonTimer();
 	clearWrongTapMark();
-	running.value = true;
 	repaint();
+	await ensureSceneAssetsLoaded(levelIndex.value);
+	repaint();
+	running.value = true;
 	startTimer();
+	preloadSceneAssets(levelIndex.value + 1);
 }
 function startTimer() {
 	stopTimer();
@@ -738,6 +753,12 @@ function nextAfterLesson() {
 		loadLevel(levelIndex.value + 1);
 	}
 }
+
+watch(showLesson, async (visible) => {
+	if (!visible) return;
+	await nextTick();
+	resetLessonScroll();
+});
 
 /* ----------------------------- 声音反馈 ----------------------------- */
 let actx: AudioContext | null = null;

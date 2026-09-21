@@ -1,8 +1,8 @@
-import { defineConfig } from 'vite'
-import vue from '@vitejs/plugin-vue'
+import { defineConfig } from 'vite';
+import vue from '@vitejs/plugin-vue';
 
 export default defineConfig({
-  plugins: [vue()],
-  base: './',
-  build: { target: 'es2020', chunkSizeWarningLimit: 1800 },
-})
+	plugins: [vue()],
+	base: './',
+	build: { target: 'es2020', chunkSizeWarningLimit: 1800 }
+});

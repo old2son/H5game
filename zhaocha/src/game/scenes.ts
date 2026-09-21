@@ -10,53 +10,133 @@
  *   - scene.render(ctx, variant)：variant 0 = 原图，1 = 含全部差异的图。
  *   - diff.paint(ctx, variant)：绘制该处差异元素（0/1 两种状态）。
  * ===========================================================================*/
-import posturePhotoUrl from '../assets/duxiezishi.png';
-import postureLessonImageUrl from '../assets/duxiezishi-result.png';
-import lightPhotoUrl from '../assets/guangxianhuanjing.png';
-import lightLessonImageUrl from '../assets/guangxianhuanjing-result.png';
-import durationPhotoUrl from '../assets/yongyanshichang.png';
-import durationLessonImageUrl from '../assets/yongyanshichang-result.png';
-import screenPhotoUrl from '../assets/yongyanjuli.png';
-import screenLessonImageUrl from '../assets/yongyanjuli-result.png';
-import outdoorPhotoUrl from '../assets/huwaiyundong.png';
-import outdoorLessonImageUrl from '../assets/huwaiyundong-result.png';
+import posturePhotoUrl from '../assets/duxiezishi.webp';
+import postureLessonImageUrl from '../assets/duxiezishi-result.webp';
+import lightPhotoUrl from '../assets/guangxianhuanjing.webp';
+import lightLessonImageUrl from '../assets/guangxianhuanjing-result.webp';
+import durationPhotoUrl from '../assets/yongyanshichang.webp';
+import durationLessonImageUrl from '../assets/yongyanshichang-result.webp';
+import screenPhotoUrl from '../assets/yongyanjuli.webp';
+import screenLessonImageUrl from '../assets/yongyanjuli-result.webp';
+import outdoorPhotoUrl from '../assets/huwaiyundong.webp';
+import outdoorLessonImageUrl from '../assets/huwaiyundong-result.webp';
 import { S, type Diff, type DiffBox, type MarkerPoint, type Point, type Scene } from './types';
 
-const posturePhoto = typeof Image === 'undefined' ? null : new Image();
-const lightPhoto = typeof Image === 'undefined' ? null : new Image();
-const durationPhoto = typeof Image === 'undefined' ? null : new Image();
-const screenPhoto = typeof Image === 'undefined' ? null : new Image();
-const outdoorPhoto = typeof Image === 'undefined' ? null : new Image();
+type SceneAssetRecord = {
+	photoUrl: string;
+	lessonImageUrl: string;
+	photo: HTMLImageElement | null;
+	photoPromise: Promise<void> | null;
+	lessonPromise: Promise<void> | null;
+};
 
-if (posturePhoto) {
-	posturePhoto.src = posturePhotoUrl;
-	posturePhoto.addEventListener('load', () => {
+const sceneAssets: SceneAssetRecord[] = [
+	{
+		photoUrl: posturePhotoUrl,
+		lessonImageUrl: postureLessonImageUrl,
+		photo: null,
+		photoPromise: null,
+		lessonPromise: null
+	},
+	{
+		photoUrl: lightPhotoUrl,
+		lessonImageUrl: lightLessonImageUrl,
+		photo: null,
+		photoPromise: null,
+		lessonPromise: null
+	},
+	{
+		photoUrl: durationPhotoUrl,
+		lessonImageUrl: durationLessonImageUrl,
+		photo: null,
+		photoPromise: null,
+		lessonPromise: null
+	},
+	{
+		photoUrl: screenPhotoUrl,
+		lessonImageUrl: screenLessonImageUrl,
+		photo: null,
+		photoPromise: null,
+		lessonPromise: null
+	},
+	{
+		photoUrl: outdoorPhotoUrl,
+		lessonImageUrl: outdoorLessonImageUrl,
+		photo: null,
+		photoPromise: null,
+		lessonPromise: null
+	}
+];
+
+function emitSceneAssetsReady() {
+	if (typeof window !== 'undefined') {
 		window.dispatchEvent(new Event('scene-assets-ready'));
-	});
+	}
 }
-if (lightPhoto) {
-	lightPhoto.src = lightPhotoUrl;
-	lightPhoto.addEventListener('load', () => {
-		window.dispatchEvent(new Event('scene-assets-ready'));
+
+function ensurePhotoLoaded(record: SceneAssetRecord) {
+	if (typeof Image === 'undefined') return Promise.resolve();
+	if (record.photo?.complete && record.photo.naturalWidth) return Promise.resolve();
+	if (record.photoPromise) return record.photoPromise;
+
+	const image = record.photo || new Image();
+	record.photo = image;
+	record.photoPromise = new Promise((resolve) => {
+		const finalize = () => {
+			image.removeEventListener('load', finalize);
+			image.removeEventListener('error', finalize);
+			record.photoPromise = null;
+			emitSceneAssetsReady();
+			resolve();
+		};
+
+		if (image.complete && image.naturalWidth) {
+			finalize();
+			return;
+		}
+
+		image.addEventListener('load', finalize);
+		image.addEventListener('error', finalize);
+		image.src = record.photoUrl;
 	});
+	return record.photoPromise;
 }
-if (durationPhoto) {
-	durationPhoto.src = durationPhotoUrl;
-	durationPhoto.addEventListener('load', () => {
-		window.dispatchEvent(new Event('scene-assets-ready'));
+
+function preloadLessonImage(record: SceneAssetRecord) {
+	if (!record.lessonImageUrl || typeof Image === 'undefined') return Promise.resolve();
+	if (record.lessonPromise) return record.lessonPromise;
+
+	record.lessonPromise = new Promise((resolve) => {
+		const image = new Image();
+		const finalize = () => {
+			image.removeEventListener('load', finalize);
+			image.removeEventListener('error', finalize);
+			resolve();
+		};
+
+		image.addEventListener('load', finalize);
+		image.addEventListener('error', finalize);
+		image.src = record.lessonImageUrl;
 	});
+	return record.lessonPromise;
 }
-if (screenPhoto) {
-	screenPhoto.src = screenPhotoUrl;
-	screenPhoto.addEventListener('load', () => {
-		window.dispatchEvent(new Event('scene-assets-ready'));
-	});
+
+export async function ensureSceneAssetsLoaded(index: number) {
+	const record = sceneAssets[index];
+	if (!record) return;
+	await ensurePhotoLoaded(record);
+	void preloadLessonImage(record);
 }
-if (outdoorPhoto) {
-	outdoorPhoto.src = outdoorPhotoUrl;
-	outdoorPhoto.addEventListener('load', () => {
-		window.dispatchEvent(new Event('scene-assets-ready'));
-	});
+
+export function preloadSceneAssets(index: number) {
+	const record = sceneAssets[index];
+	if (!record) return;
+	void ensurePhotoLoaded(record);
+	void preloadLessonImage(record);
+}
+
+function getScenePhoto(index: number) {
+	return sceneAssets[index]?.photo || null;
 }
 
 function drawStackedPhoto(
@@ -69,19 +149,19 @@ function drawStackedPhoto(
 	return true;
 }
 function drawPosturePhoto(ctx: CanvasRenderingContext2D) {
-	return drawStackedPhoto(ctx, posturePhoto, postureStackLayout);
+	return drawStackedPhoto(ctx, getScenePhoto(0), postureStackLayout);
 }
 function drawLightPhoto(ctx: CanvasRenderingContext2D) {
-	return drawStackedPhoto(ctx, lightPhoto, lightStackLayout);
+	return drawStackedPhoto(ctx, getScenePhoto(1), lightStackLayout);
 }
 function drawDurationPhoto(ctx: CanvasRenderingContext2D) {
-	return drawStackedPhoto(ctx, durationPhoto, durationStackLayout);
+	return drawStackedPhoto(ctx, getScenePhoto(2), durationStackLayout);
 }
 function drawScreenPhoto(ctx: CanvasRenderingContext2D) {
-	return drawStackedPhoto(ctx, screenPhoto, screenStackLayout);
+	return drawStackedPhoto(ctx, getScenePhoto(3), screenStackLayout);
 }
 function drawOutdoorPhoto(ctx: CanvasRenderingContext2D) {
-	return drawStackedPhoto(ctx, outdoorPhoto, outdoorStackLayout);
+	return drawStackedPhoto(ctx, getScenePhoto(4), outdoorStackLayout);
 }
 
 const postureStackLayout = {
