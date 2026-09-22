@@ -51,7 +51,16 @@
 			@confirm="nextAfterLesson"
 		>
 			<div ref="lessonContentRef" class="lesson">
-				<div v-if="lessonDialogImage" class="lesson-illus lesson-illus-image">
+				<div
+					v-if="lessonDialogImage"
+					class="lesson-illus lesson-illus-image"
+					role="button"
+					tabindex="0"
+					aria-label="预览科普图片"
+					@click="previewLessonImage"
+					@keydown.enter.prevent="previewLessonImage"
+					@keydown.space.prevent="previewLessonImage"
+				>
 					<img :src="lessonDialogImage" :alt="`${lessonDialogSceneName} 科普图`" />
 				</div>
 				<div v-else class="lesson-illus">🖼️<br /><span>科普图文占位</span></div>
@@ -80,7 +89,7 @@
 <script setup lang="ts">
 import { ref, computed, nextTick, onMounted, onUnmounted, watch } from 'vue';
 import { useRouter } from 'vue-router';
-import { Button as VanButton, Dialog as VanDialog, Icon as VanIcon } from 'vant';
+import { Button as VanButton, Dialog as VanDialog, Icon as VanIcon, showImagePreview } from 'vant';
 import { SCENES, PLACEHOLDER_TIPS, ensureSceneAssetsLoaded, preloadSceneAssets } from '../game/scenes';
 import { useGameStore, TOTAL_LEVELS } from '../store/game';
 import tipsIconUrl from '../assets/tips.png';
@@ -535,6 +544,14 @@ function resetLessonScroll() {
 		dialogContentEl.scrollTop = 0;
 	}
 }
+function previewLessonImage() {
+	if (!lessonDialogImage.value) return;
+	showImagePreview({
+		images: [lessonDialogImage.value],
+		startPosition: 0,
+		closeable: true
+	});
+}
 
 function startHintAnimation() {
 	stopHintAnimation();
@@ -953,11 +970,12 @@ onUnmounted(() => {
 .lesson-illus-image {
 	padding: 0;
 	overflow: hidden;
-	width: min(100%, 280px);
-	aspect-ratio: 2 / 3;
+	width: min(100%, 220px);
+	aspect-ratio: 9 / 16;
 	margin-left: auto;
 	margin-right: auto;
 	background: #fff;
+	cursor: zoom-in;
 }
 .lesson-illus-image img {
 	display: block;
