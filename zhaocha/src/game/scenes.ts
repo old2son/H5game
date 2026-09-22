@@ -493,7 +493,7 @@ const screenDiffs: Diff[] = [
 
 const sceneScreen: Scene = {
 	name: '屏幕距离',
-	desc: '看屏幕保持一臂距离（约 50~70cm），屏幕顶端与视线平齐，并开启护眼模式。',
+	desc: '近距离用眼时多眨眼能有效缓解眼疲劳，看屏幕保持一臂距离（约 50~70cm），屏幕顶端与视线平齐，并开启护眼模式。',
 	tip: '屏幕别凑太近，开护眼滤蓝光。',
 	lessonImage: screenLessonImageUrl,
 	boardMode: 'stacked',

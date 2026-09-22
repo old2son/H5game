@@ -1,0 +1,11 @@
+<svg viewBox="0 0 130 180" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="lens-piece" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fff4bf" />
+      <stop offset="100%" stop-color="#ffc96f" />
+    </linearGradient>
+  </defs>
+  <path d="M65 18 C96 38 104 142 65 162 C26 142 34 38 65 18 Z" fill="url(#lens-piece)" stroke="#15385b" stroke-width="5"/>
+  <ellipse cx="65" cy="90" rx="20" ry="52" fill="#ffffff" fill-opacity="0.18"/>
+  <text x="50%" y="92%" text-anchor="middle" font-size="14" font-weight="700" fill="#12324f">拖拽</text>
+</svg>

@@ -1,0 +1,843 @@
+* {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+:root {
+  --primary: #159a91;
+  --primary-dark: #08756e;
+  --primary-light: #dff7f4;
+  --blue: #48aeea;
+  --text: #183b4a;
+  --muted: #72909c;
+  --bg: #eef8ff;
+  --card: #ffffff;
+  --danger: #ef6c64;
+  --shadow: 0 14px 45px rgba(31, 99, 121, 0.13);
+}
+
+html,
+body {
+  margin: 0;
+  width: 100%;
+  min-height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font-family:
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    "PingFang SC",
+    "Microsoft YaHei",
+    sans-serif;
+  overscroll-behavior: none;
+}
+
+body {
+  min-height: 100svh;
+}
+
+button {
+  font: inherit;
+}
+
+#app {
+  width: 100%;
+  min-height: 100svh;
+}
+
+.screen {
+  display: none;
+  width: 100%;
+  min-height: 100svh;
+}
+
+.screen.active {
+  display: flex;
+}
+
+/* ---------- 通用 ---------- */
+
+.primary-btn {
+  border: 0;
+  width: 100%;
+  min-height: 54px;
+  border-radius: 18px;
+  color: #fff;
+  font-weight: 800;
+  font-size: 17px;
+  letter-spacing: 1px;
+  background: linear-gradient(135deg, #20aaa0, #0d857d);
+  box-shadow: 0 10px 22px rgba(13, 133, 125, 0.22);
+  cursor: pointer;
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
+}
+
+.primary-btn:active {
+  transform: scale(0.97);
+}
+
+.hidden {
+  display: none !important;
+}
+
+/* ---------- 开始页 ---------- */
+
+#startScreen {
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background:
+    radial-gradient(circle at 15% 15%, rgba(77, 186, 240, 0.18), transparent 30%),
+    radial-gradient(circle at 85% 80%, rgba(29, 175, 161, 0.16), transparent 30%),
+    var(--bg);
+}
+
+.start-card {
+  width: min(100%, 520px);
+  padding: 34px 28px 30px;
+  background: rgba(255, 255, 255, 0.88);
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  border-radius: 30px;
+  box-shadow: var(--shadow);
+  text-align: center;
+}
+
+.eyeball-logo {
+  display: grid;
+  place-items: center;
+  margin-bottom: 22px;
+}
+
+.eye-outer {
+  position: relative;
+  width: 112px;
+  height: 78px;
+  border-radius: 52% 48% 50% 50%;
+  background: #fff;
+  border: 5px solid #d7eaf0;
+  box-shadow: 0 12px 25px rgba(43, 120, 141, 0.13);
+  transform: rotate(-2deg);
+  overflow: hidden;
+}
+
+.eye-iris {
+  position: absolute;
+  width: 49px;
+  height: 49px;
+  border-radius: 50%;
+  background: radial-gradient(circle, #213f51 0 20%, #5cb1bd 21% 55%, #207a8a 56% 100%);
+  left: 32px;
+  top: 12px;
+}
+
+.eye-pupil {
+  position: absolute;
+  width: 19px;
+  height: 19px;
+  border-radius: 50%;
+  background: #102c3a;
+  left: 47px;
+  top: 27px;
+}
+
+.eye-highlight {
+  position: absolute;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #fff;
+  left: 51px;
+  top: 29px;
+}
+
+.eyebrow {
+  color: var(--primary);
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 1.5px;
+  margin: 0 0 8px;
+}
+
+.start-card h1 {
+  margin: 0;
+  font-size: clamp(30px, 8vw, 42px);
+  line-height: 1.2;
+}
+
+.start-desc {
+  margin: 14px 0 24px;
+  color: var(--muted);
+  line-height: 1.8;
+  font-size: 14px;
+}
+
+.how-to {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin: 0 0 26px;
+}
+
+.how-item {
+  width: 84px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.how-item span {
+  font-size: 20px;
+}
+
+.how-item b {
+  font-size: 13px;
+}
+
+.how-item small {
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.how-arrow {
+  color: #9ab4be;
+  font-size: 17px;
+}
+
+/* ---------- 拼装页 ---------- */
+
+#gameScreen,
+#quizScreen {
+  flex-direction: column;
+  align-items: center;
+  padding:
+    max(18px, env(safe-area-inset-top))
+    16px
+    max(18px, env(safe-area-inset-bottom));
+}
+
+.game-header,
+.quiz-header {
+  width: min(100%, 620px);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 0 12px;
+}
+
+.game-title {
+  font-size: 21px;
+  font-weight: 900;
+}
+
+.game-subtitle {
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.score-box {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 8px 12px;
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: 0 5px 20px rgba(31, 99, 121, 0.08);
+}
+
+.score-box span {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.score-box strong {
+  color: var(--primary-dark);
+  font-size: 20px;
+}
+
+.instruction {
+  width: min(100%, 620px);
+  padding: 10px 14px;
+  border-radius: 14px;
+  background: rgba(255,255,255,.7);
+  color: #547582;
+  font-size: 12px;
+  text-align: center;
+}
+
+.instruction-icon {
+  margin-right: 5px;
+}
+
+.eye-board {
+  position: relative;
+  width: min(100%, 620px);
+  height: min(65svh, 570px);
+  min-height: 350px;
+  margin: 12px auto;
+  border-radius: 28px;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 50% 50%, rgba(255,255,255,.95), rgba(224,244,249,.65)),
+    #e8f7fa;
+  box-shadow: inset 0 0 0 1px rgba(109, 178, 194, 0.14);
+  touch-action: none;
+}
+
+.eye-diagram {
+  position: absolute;
+  width: min(74vw, 420px);
+  aspect-ratio: 1.3 / 1;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -52%);
+}
+
+/* 眼球整体 */
+.sclera {
+  position: absolute;
+  inset: 0;
+  border-radius: 50% 50% 47% 47%;
+  background:
+    radial-gradient(circle at 42% 42%, #fff 0 28%, #f8fcfd 62%, #dbecef 100%);
+  border: 3px solid #b7d6de;
+  box-shadow:
+    inset 0 0 28px rgba(89, 165, 180, .12),
+    0 12px 25px rgba(37, 111, 128, .1);
+}
+
+.vitreous {
+  position: absolute;
+  left: 24%;
+  right: 7%;
+  top: 12%;
+  bottom: 12%;
+  border-radius: 50%;
+  background: radial-gradient(circle at 45% 45%, rgba(255,255,255,.5), rgba(194,232,241,.18));
+}
+
+/* 目标区域 */
+.target {
+  position: absolute;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #638894;
+  font-size: 11px;
+  font-weight: 700;
+  border: 2px dashed rgba(46, 142, 157, .48);
+  background: rgba(99, 198, 204, .10);
+  transition: .2s ease;
+}
+
+.target span {
+  pointer-events: none;
+}
+
+.target.active-target {
+  border-color: var(--primary);
+  background: rgba(26, 169, 157, .18);
+  box-shadow: 0 0 0 5px rgba(26,169,157,.08);
+}
+
+.target.completed {
+  border-style: solid;
+  border-color: transparent;
+  background: transparent;
+  color: transparent;
+}
+
+.target-cornea {
+  left: -1%;
+  top: 27%;
+  width: 29%;
+  height: 46%;
+  border-radius: 52% 0 0 52%;
+}
+
+.target-iris {
+  left: 17%;
+  top: 34%;
+  width: 16%;
+  height: 32%;
+  border-radius: 50%;
+}
+
+.target-lens {
+  left: 27%;
+  top: 29%;
+  width: 15%;
+  height: 42%;
+  border-radius: 48%;
+}
+
+.target-retina {
+  right: 7%;
+  top: 14%;
+  width: 10%;
+  height: 72%;
+  border-radius: 0 50% 50% 0;
+}
+
+.target-optic-nerve {
+  right: -18%;
+  top: 38%;
+  width: 27%;
+  height: 24%;
+  border-radius: 50%;
+  transform: rotate(-3deg);
+}
+
+.retina-line {
+  position: absolute;
+  right: 18%;
+  height: 80%;
+  width: 4px;
+  border-radius: 10px;
+  background: rgba(235, 117, 125, .5);
+}
+
+.optic-nerve-base {
+  position: absolute;
+  right: -19%;
+  top: 40%;
+  width: 28%;
+  height: 20%;
+  border-radius: 50%;
+  background: #efd1ba;
+  transform: rotate(-3deg);
+  z-index: 1;
+}
+
+.eye-label {
+  position: absolute;
+  z-index: 4;
+  color: #89a5ae;
+  font-size: 10px;
+}
+
+.label-top {
+  left: 2%;
+  top: 5%;
+}
+
+.label-bottom {
+  right: 4%;
+  bottom: 4%;
+}
+
+.parts-tray {
+  width: min(100%, 620px);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 4px 0;
+}
+
+.part {
+  position: relative;
+  user-select: none;
+  touch-action: none;
+  cursor: grab;
+  min-width: 84px;
+  min-height: 45px;
+  padding: 8px 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #d4e9ed;
+  border-radius: 14px;
+  background: #fff;
+  color: #285766;
+  font-size: 13px;
+  font-weight: 800;
+  box-shadow: 0 5px 14px rgba(31, 99, 121, 0.09);
+  transition: transform .18s ease, opacity .18s ease;
+}
+
+.part:active {
+  cursor: grabbing;
+}
+
+.part.dragging {
+  z-index: 1000;
+  transform: scale(1.08);
+  box-shadow: 0 15px 30px rgba(31, 99, 121, .22);
+}
+
+.part.completed {
+  opacity: .35;
+  pointer-events: none;
+}
+
+.drag-clone {
+  position: fixed !important;
+  z-index: 5000 !important;
+  pointer-events: none !important;
+  margin: 0 !important;
+}
+
+.success-flash {
+  position: absolute;
+  z-index: 200;
+  left: 50%;
+  top: 42%;
+  transform: translate(-50%, -50%) scale(.7);
+  opacity: 0;
+  pointer-events: none;
+  padding: 12px 22px;
+  border-radius: 30px;
+  background: rgba(255,255,255,.95);
+  color: var(--primary-dark);
+  font-weight: 900;
+  box-shadow: 0 10px 30px rgba(31,99,121,.16);
+}
+
+.success-flash.show {
+  animation: successPop .9s ease forwards;
+}
+
+@keyframes successPop {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(.65); }
+  25% { opacity: 1; transform: translate(-50%, -50%) scale(1.08); }
+  75% { opacity: 1; transform: translate(-50%, -65%) scale(1); }
+  100% { opacity: 0; transform: translate(-50%, -85%) scale(.95); }
+}
+
+/* ---------- 科普卡片 ---------- */
+
+.overlay-screen {
+  align-items: center;
+  justify-content: center;
+  padding: 22px;
+  background: rgba(225, 243, 248, .86);
+  backdrop-filter: blur(10px);
+}
+
+.info-card,
+.complete-card,
+.result-card {
+  width: min(100%, 460px);
+  padding: 28px 24px 24px;
+  background: #fff;
+  border-radius: 28px;
+  box-shadow: var(--shadow);
+  text-align: center;
+  animation: cardIn .35s ease;
+}
+
+@keyframes cardIn {
+  from { opacity: 0; transform: translateY(20px) scale(.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.info-icon {
+  width: 66px;
+  height: 66px;
+  margin: 0 auto 12px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--primary-light);
+  font-size: 34px;
+}
+
+.info-part-name {
+  font-size: 28px;
+  font-weight: 900;
+}
+
+.info-tag {
+  display: inline-block;
+  margin: 8px auto 20px;
+  padding: 6px 12px;
+  border-radius: 20px;
+  background: #eaf7ff;
+  color: #3983a7;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.info-section {
+  padding: 13px 15px;
+  margin-bottom: 10px;
+  text-align: left;
+  border-radius: 15px;
+  background: #f7fbfc;
+}
+
+.info-section-title {
+  color: var(--primary-dark);
+  font-size: 12px;
+  font-weight: 900;
+  margin-bottom: 5px;
+}
+
+.info-section p {
+  margin: 0;
+  color: #58737e;
+  line-height: 1.7;
+  font-size: 13px;
+}
+
+.info-card .primary-btn {
+  margin-top: 8px;
+}
+
+/* ---------- 完成页 ---------- */
+
+.complete-eye,
+.result-medal {
+  font-size: 58px;
+  margin-bottom: 12px;
+}
+
+.complete-badge,
+.result-small-title {
+  display: inline-block;
+  padding: 6px 13px;
+  border-radius: 20px;
+  background: var(--primary-light);
+  color: var(--primary-dark);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.complete-card h2,
+.result-card h2 {
+  margin: 12px 0 7px;
+  font-size: 27px;
+}
+
+.complete-card > p {
+  margin: 0 0 20px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.complete-stats {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  margin-bottom: 22px;
+}
+
+.complete-stats > div {
+  min-width: 125px;
+  padding: 14px;
+  border-radius: 17px;
+  background: #f6fbfc;
+}
+
+.complete-stats strong {
+  display: block;
+  font-size: 24px;
+  color: var(--primary-dark);
+}
+
+.complete-stats span {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+/* ---------- 问答 ---------- */
+
+.quiz-card {
+  width: min(100%, 620px);
+  margin: 18px auto;
+  padding: 25px 20px;
+  border-radius: 26px;
+  background: #fff;
+  box-shadow: var(--shadow);
+}
+
+.question-number {
+  color: var(--primary);
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 1.5px;
+}
+
+.quiz-card h2 {
+  margin: 12px 0 20px;
+  font-size: clamp(20px, 5vw, 27px);
+  line-height: 1.5;
+}
+
+.options {
+  display: grid;
+  gap: 10px;
+}
+
+.option {
+  width: 100%;
+  padding: 14px 15px;
+  border: 2px solid #e2edf0;
+  border-radius: 15px;
+  background: #fff;
+  text-align: left;
+  color: #355965;
+  cursor: pointer;
+  transition: .18s ease;
+}
+
+.option:hover {
+  border-color: #8bd2ce;
+}
+
+.option.correct {
+  border-color: #28a99e;
+  background: #eafaf8;
+  color: #08756e;
+}
+
+.option.wrong {
+  border-color: #ef8d87;
+  background: #fff2f1;
+  color: #bb504b;
+}
+
+.option.disabled {
+  pointer-events: none;
+}
+
+.quiz-feedback {
+  min-height: 45px;
+  margin: 14px 0 0;
+  color: #67828d;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.quiz-feedback.correct-text {
+  color: #08756e;
+}
+
+.quiz-feedback.wrong-text {
+  color: #b9554e;
+}
+
+/* ---------- 结果 ---------- */
+
+.result-score {
+  margin: 20px auto;
+  padding: 16px;
+  border-radius: 20px;
+  background: linear-gradient(135deg, #e9faf8, #eff8ff);
+}
+
+.result-score span {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.result-score strong {
+  display: block;
+  margin-top: 2px;
+  font-size: 52px;
+  line-height: 1.1;
+  color: var(--primary-dark);
+}
+
+.result-message {
+  color: #607b86;
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.result-detail {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin: 20px 0;
+}
+
+.result-detail div {
+  padding: 13px;
+  border-radius: 15px;
+  background: #f7fbfc;
+}
+
+.result-detail span {
+  display: block;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.result-detail b {
+  display: block;
+  margin-top: 3px;
+  font-size: 21px;
+  color: var(--text);
+}
+
+/* ---------- Toast ---------- */
+
+.toast {
+  position: fixed;
+  z-index: 9999;
+  left: 50%;
+  bottom: calc(20px + env(safe-area-inset-bottom));
+  transform: translate(-50%, 20px);
+  opacity: 0;
+  pointer-events: none;
+  padding: 10px 17px;
+  border-radius: 20px;
+  background: rgba(24, 59, 74, .92);
+  color: #fff;
+  font-size: 12px;
+  transition: .25s ease;
+}
+
+.toast.show {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
+/* ---------- 小屏优化 ---------- */
+
+@media (max-height: 700px) {
+  .eye-board {
+    height: min(57svh, 430px);
+    min-height: 300px;
+  }
+
+  .start-card {
+    padding-top: 22px;
+    padding-bottom: 22px;
+  }
+
+  .eyeball-logo {
+    margin-bottom: 12px;
+  }
+
+  .start-desc {
+    margin: 9px 0 16px;
+  }
+
+  .how-to {
+    margin-bottom: 17px;
+  }
+}
+
+@media (min-width: 700px) {
+  #gameScreen,
+  #quizScreen {
+    padding-left: 24px;
+    padding-right: 24px;
+  }
+
+  .parts-tray {
+    gap: 10px;
+  }
+
+  .part {
+    min-width: 100px;
+  }
+}

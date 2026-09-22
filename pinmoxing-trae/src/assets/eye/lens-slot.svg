@@ -1,0 +1,9 @@
+<svg viewBox="0 0 130 180" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="lens-slot" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fff8db" />
+      <stop offset="100%" stop-color="#ffe5b5" />
+    </linearGradient>
+  </defs>
+  <path d="M65 18 C96 38 104 142 65 162 C26 142 34 38 65 18 Z" fill="url(#lens-slot)" stroke="#6ea8d5" stroke-width="3" stroke-dasharray="8 6"/>
+</svg>

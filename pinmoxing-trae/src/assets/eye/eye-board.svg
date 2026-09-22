@@ -1,0 +1,31 @@
+<svg viewBox="0 0 760 540" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="shellGlow" cx="38%" cy="30%" r="75%">
+      <stop offset="0%" stop-color="#ffffff" />
+      <stop offset="68%" stop-color="#d8edf9" />
+      <stop offset="100%" stop-color="#bdd9ed" />
+    </radialGradient>
+    <linearGradient id="retinaGlow" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f7b3c9" stop-opacity="0.86" />
+      <stop offset="100%" stop-color="#e17aa0" stop-opacity="0.58" />
+    </linearGradient>
+  </defs>
+  <ellipse cx="376" cy="270" rx="272" ry="205" fill="url(#shellGlow)" stroke="#84b3d3" stroke-width="12" />
+  <path
+    d="M126 270 C160 154 262 104 388 104 C512 104 620 160 648 270 C620 382 512 438 388 438 C262 438 160 388 126 270 Z"
+    fill="#f6fbff"
+    stroke="#bfd8ea"
+    stroke-width="5"
+  />
+  <ellipse cx="180" cy="270" rx="72" ry="145" fill="#f2fbff" fill-opacity="0.72" stroke="#8fbad7" stroke-width="5" />
+  <path
+    d="M514 114 C590 146 642 210 642 270 C642 332 590 394 514 426"
+    fill="none"
+    stroke="url(#retinaGlow)"
+    stroke-width="28"
+    stroke-linecap="round"
+  />
+  <path d="M619 268 L700 304" stroke="#d49b74" stroke-width="32" stroke-linecap="round" />
+  <circle cx="648" cy="288" r="19" fill="#efbf9c" />
+  <circle cx="210" cy="270" r="10" fill="#ffffff" fill-opacity="0.92" />
+</svg>

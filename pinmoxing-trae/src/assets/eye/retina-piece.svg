@@ -1,0 +1,5 @@
+<svg viewBox="0 0 220 220" xmlns="http://www.w3.org/2000/svg">
+  <path d="M180 24 C126 40 92 86 92 110 C92 134 126 180 180 196" fill="none" stroke="#c04a73" stroke-width="32" stroke-linecap="round"/>
+  <path d="M176 38 C134 54 114 88 114 110 C114 132 134 166 176 182" fill="none" stroke="#ffd6e4" stroke-width="12" stroke-linecap="round"/>
+  <text x="50%" y="92%" text-anchor="middle" font-size="14" font-weight="700" fill="#12324f">拖拽</text>
+</svg>

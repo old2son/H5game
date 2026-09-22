@@ -1,0 +1,5 @@
+<svg viewBox="0 0 120 180" xmlns="http://www.w3.org/2000/svg">
+  <ellipse cx="60" cy="90" rx="38" ry="70" fill="#6fd0c8" stroke="#15385b" stroke-width="5"/>
+  <ellipse cx="60" cy="90" rx="14" ry="28" fill="#15385b" stroke="#15385b" stroke-width="2"/>
+  <text x="50%" y="92%" text-anchor="middle" font-size="14" font-weight="700" fill="#12324f">拖拽</text>
+</svg>

@@ -1,0 +1,9 @@
+<svg viewBox="0 0 120 180" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="cornea-slot" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#edf7ff" stop-opacity="0.44" />
+      <stop offset="100%" stop-color="#c9e2f6" stop-opacity="0.26" />
+    </linearGradient>
+  </defs>
+  <ellipse cx="50" cy="90" rx="34" ry="72" fill="url(#cornea-slot)" stroke="#6ea8d5" stroke-width="3" stroke-dasharray="8 6"/>
+</svg>
