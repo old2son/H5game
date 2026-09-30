@@ -443,7 +443,7 @@ const durationDiffs: Diff[] = [
 
 const sceneDuration: Scene = {
 	name: '用眼时长',
-	desc: '近距离用眼 20~30 分钟，就远眺 20 秒（20-20-20 法则），让眼睛休息。',
+	desc: '近距离用眼20分钟，眺望20英寸外的远方，约20秒，让眼睛休息。',
 	tip: '定时休息，别连续苦读两小时。',
 	lessonImage: durationLessonImageUrl,
 	boardMode: 'stacked',

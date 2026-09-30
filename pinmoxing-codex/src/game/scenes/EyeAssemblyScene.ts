@@ -2,7 +2,7 @@ import * as Phaser from 'phaser';
 import { RENDER_SCALE, VIEW_HEIGHT, VIEW_WIDTH } from '../constants';
 
 type GameState = 'intro' | 'scatter' | 'assemble' | 'quiz' | 'result';
-type PartId = 'cornea' | 'iris' | 'lens' | 'retina' | 'optic';
+type PartId = 'cornea' | 'iris' | 'lens' | 'body' | 'retina' | 'optic';
 
 interface EyePart {
 	id: PartId;
@@ -32,7 +32,7 @@ const PARTS: EyePart[] = [
 		placedOffset: [25, 0],
 		placedAlpha: 0.95,
 		placedDepth: 7,
-		target: new Phaser.Math.Vector2(70, 326),
+		target: new Phaser.Math.Vector2(70, 300),
 		clue: '透明小圆顶',
 		fact: '角膜像透明小窗，是光线进入眼睛的第一站，还能帮助光线聚焦。'
 	},
@@ -45,7 +45,7 @@ const PARTS: EyePart[] = [
 		placedSize: [56, 106],
 		placedAlpha: 0.98,
 		placedDepth: 8,
-		target: new Phaser.Math.Vector2(111, 326),
+		target: new Phaser.Math.Vector2(111, 300),
 		clue: '彩色光圈',
 		fact: '虹膜是眼睛有颜色的部分，像相机光圈一样调节进入眼内的光量。'
 	},
@@ -58,9 +58,23 @@ const PARTS: EyePart[] = [
 		placedSize: [74, 80],
 		placedAlpha: 0.96,
 		placedDepth: 9,
-		target: new Phaser.Math.Vector2(158, 326),
+		target: new Phaser.Math.Vector2(158, 300),
 		clue: '透明小镜片',
 		fact: '晶状体像一块会变形的小镜片，帮助远近不同的物体清晰成像。'
+	},
+	{
+		id: 'body',
+		name: '玻璃体',
+		color: 0x79d7ff,
+		asset: 'part-body',
+		iconSize: [58, 58],
+		placedSize: [126, 168],
+		placedOffset: [0, 0],
+		placedAlpha: 0.52,
+		placedDepth: 6,
+		target: new Phaser.Math.Vector2(218, 300),
+		clue: '透明凝胶',
+		fact: '玻璃体像透明果冻，填满眼球中间的大空间，帮助眼球保持圆润形状，并让光线顺利通过。'
 	},
 	{
 		id: 'retina',
@@ -73,7 +87,7 @@ const PARTS: EyePart[] = [
 		placedAlpha: 0.68,
 		placedDepth: 5,
 		placedBlendMode: Phaser.BlendModes.MULTIPLY,
-		target: new Phaser.Math.Vector2(273, 326),
+		target: new Phaser.Math.Vector2(292, 300),
 		clue: '感光屏幕',
 		fact: '视网膜像相机的感光屏幕，把光转换成大脑能读懂的电信号。'
 	},
@@ -88,7 +102,7 @@ const PARTS: EyePart[] = [
 		placedAlpha: 0.96,
 		placedDepth: 10,
 		placedAngle: 24,
-		target: new Phaser.Math.Vector2(332, 326),
+		target: new Phaser.Math.Vector2(344, 300),
 		clue: '信号电缆',
 		fact: '视神经像信号电缆，把视网膜产生的视觉信号送往大脑。'
 	}
@@ -109,15 +123,16 @@ const INFO_CARD_X = 195;
 const INFO_CARD_Y = 418;
 const INFO_CARD_ENTER_Y = 431;
 const PARTS_TITLE_X = 38;
-const PARTS_TITLE_Y = INFO_CARD_Y + 67;
-const PARTS_ROW1_Y = INFO_CARD_Y + 137;
-const PARTS_ROW2_Y = INFO_CARD_Y + 226;
+const PARTS_TITLE_Y = INFO_CARD_Y + 80;
+const PARTS_ROW1_Y = INFO_CARD_Y + 150;
+const PARTS_ROW2_Y = INFO_CARD_Y + 250;
 const PARTS_HOME_POSITIONS = [
 	[78, PARTS_ROW1_Y],
 	[195, PARTS_ROW1_Y],
 	[312, PARTS_ROW1_Y],
-	[136, PARTS_ROW2_Y],
-	[254, PARTS_ROW2_Y]
+	[78, PARTS_ROW2_Y],
+	[195, PARTS_ROW2_Y],
+	[312, PARTS_ROW2_Y]
 ] as const;
 const INTRO_PANEL_X = 195;
 const INTRO_PANEL_Y = 438;
@@ -125,9 +140,48 @@ const INTRO_MODEL_Y = -90;
 const INTRO_MODEL_FLOAT_OFFSET = 3;
 const INTRO_MODEL_SHADOW_OFFSET_Y = 88;
 const INTRO_MODEL_SHADOW_Y = INTRO_MODEL_Y + INTRO_MODEL_SHADOW_OFFSET_Y;
+const SCENE_BACKGROUND_FILL_Y = 426;
+const SCENE_BACKGROUND_FILL_HEIGHT = 718;
+const SCENE_PANEL_RADIUS = 8;
+const SCENE_PANEL_STROKE_WIDTH = 1;
+const SCENE_MAIN_PANEL = {
+	x: 18,
+	y: 124,
+	width: 354,
+	height: 326,
+	fillAlpha: 0.97,
+	strokeColor: 0xbfc9f4,
+	strokeAlpha: 0.8
+} as const;
+const SCENE_PARTS_PANEL = {
+	x: 18,
+	y: 478,
+	width: 354,
+	height: 254,
+	fillAlpha: 0.9,
+	strokeColor: 0xc9d7f2,
+	strokeAlpha: 0.7
+} as const;
+const SCENE_PARTS_DECOR_TOP_Y = SCENE_PARTS_PANEL.y - 22;
+const SCENE_PARTS_DECOR_BOTTOM_Y = SCENE_PARTS_PANEL.y + SCENE_PARTS_PANEL.height + 16;
+const SCENE_PARTS_DECOR_DOTS = [
+	[36, SCENE_PARTS_DECOR_TOP_Y - 10, 4, 0],
+	[112, SCENE_PARTS_DECOR_TOP_Y + 7, 6, 1],
+	[184, SCENE_PARTS_DECOR_TOP_Y - 4, 5, 0],
+	[232, SCENE_PARTS_DECOR_TOP_Y + 11, 7, 1],
+	[338, SCENE_PARTS_DECOR_TOP_Y - 6, 4, 0],
+	[58, SCENE_PARTS_DECOR_BOTTOM_Y + 8, 6, 1],
+	[146, SCENE_PARTS_DECOR_BOTTOM_Y - 9, 4, 0],
+	[224, SCENE_PARTS_DECOR_BOTTOM_Y + 12, 7, 1],
+	[286, SCENE_PARTS_DECOR_BOTTOM_Y - 5, 5, 0],
+	[346, SCENE_PARTS_DECOR_BOTTOM_Y + 3, 4, 1]
+] as const;
+const SCENE_DECOR_CIRCLES = [
+	[46, 250, 82],
+	[360, 492, 96]
+] as const;
 
-// debug
-const AUTO_START_FOR_TESTING = false;
+const AUTO_START_FOR_DEBUG = true;
 
 export class EyeAssemblyScene extends Phaser.Scene {
 	private state: GameState = 'intro';
@@ -141,6 +195,7 @@ export class EyeAssemblyScene extends Phaser.Scene {
 	private placedPartImages: Phaser.GameObjects.Image[] = [];
 	private placedLabels: Phaser.GameObjects.Container[] = [];
 	private targetMarkers = new Map<PartId, Phaser.GameObjects.Container>();
+	private sceneBackground!: Phaser.GameObjects.Graphics;
 	private hudBackground!: Phaser.GameObjects.Graphics;
 	private headerLayer!: Phaser.GameObjects.Container;
 	private targetLayer!: Phaser.GameObjects.Container;
@@ -165,6 +220,7 @@ export class EyeAssemblyScene extends Phaser.Scene {
 		this.load.image('part-cornea', 'assets/part-cornea-3d.png');
 		this.load.image('part-iris', 'assets/part-iris-3d.png');
 		this.load.image('part-lens', 'assets/part-lens-3d.png');
+		this.load.image('part-body', 'assets/part-body-3d.png');
 		this.load.image('part-retina', 'assets/part-retina-3d.png');
 		this.load.image('part-optic', 'assets/part-optic-3d-v2.png');
 	}
@@ -182,33 +238,51 @@ export class EyeAssemblyScene extends Phaser.Scene {
 		this.createEyeDiagram();
 		this.createInfoCard();
 		this.createIntro();
-		if (AUTO_START_FOR_TESTING) {
+		if (AUTO_START_FOR_DEBUG) {
 			this.introPanel.setVisible(false).setAlpha(0);
 			this.time.delayedCall(0, () => this.startAssembly());
 		}
 	}
 
 	private drawSceneBackground() {
-		const g = this.add.graphics();
-		// g.fillStyle(0xeaf8ff).fillRect(0, 126, 390, 718);
-		// g.fillStyle(0xcfefff, 0.8).fillCircle(46, 250, 82).fillCircle(360, 492, 96);
-		// g.fillStyle(0xffffff, 0.97).fillRoundedRect(18, 144, 354, 420, 24);
-		// g.lineStyle(2, 0xbfc9f4, 0.8).strokeRoundedRect(18, 144, 354, 420, 24);
-		// g.fillStyle(0xffffff, 0.9).fillRoundedRect(18, 578, 354, 224, 22);
-		// g.lineStyle(2, 0xc9d7f2, 0.7).strokeRoundedRect(18, 578, 354, 224, 22);
-		for (let i = 0; i < 10; i++) {
-			g.fillStyle(i % 2 ? 0x8bd8ec : 0xb5a2ee, 0.32).fillCircle(
-				20 + ((i * 47) % 370),
-				566 + (i % 3) * 96,
-				5 + (i % 3) * 2
-			);
-		}
+		this.sceneBackground = this.add.graphics().setVisible(false);
+		this.sceneBackground
+			.fillStyle(0xeaf8ff)
+			.fillRect(0, SCENE_BACKGROUND_FILL_Y, VIEW_WIDTH, SCENE_BACKGROUND_FILL_HEIGHT);
+		this.sceneBackground.fillStyle(0xcfefff, 0.8);
+		SCENE_DECOR_CIRCLES.forEach(([x, y, radius]) => this.sceneBackground.fillCircle(x, y, radius));
+		SCENE_PARTS_DECOR_DOTS.forEach(([x, y, radius, colorIndex]) => {
+			this.sceneBackground.fillStyle(colorIndex ? 0xb5a2ee : 0x8bd8ec, 0.32).fillCircle(x, y, radius);
+		});
+		this.drawScenePanel(SCENE_MAIN_PANEL);
+		this.drawScenePanel(SCENE_PARTS_PANEL);
+	}
+
+	private drawScenePanel(panel: {
+		x: number;
+		y: number;
+		width: number;
+		height: number;
+		fillAlpha: number;
+		strokeColor: number;
+		strokeAlpha: number;
+	}) {
+		this.sceneBackground
+			.fillStyle(0xffffff, panel.fillAlpha)
+			.fillRoundedRect(panel.x, panel.y, panel.width, panel.height, SCENE_PANEL_RADIUS);
+		this.sceneBackground
+			.lineStyle(SCENE_PANEL_STROKE_WIDTH, panel.strokeColor, panel.strokeAlpha)
+			.strokeRoundedRect(panel.x, panel.y, panel.width, panel.height, SCENE_PANEL_RADIUS);
 	}
 
 	private drawHudBackground() {
 		this.hudBackground = this.add.graphics().setVisible(false);
-		this.hudBackground.fillStyle(0x5848ca).fillRect(0, 0, 390, 126);
+		this.hudBackground.fillStyle(0x5848ca).fillRect(0, 0, 390, 96);
 		this.hudBackground.fillStyle(0x786be3).fillCircle(38, 52, 58).fillCircle(352, 28, 70);
+		const maskShape = this.add.rectangle(195, 48, 390, 96, 0xffffff);
+		this.children.remove(maskShape);
+		this.hudBackground.enableFilters();
+		this.hudBackground.filters!.internal.addMask(maskShape, false, this.cameras.main);
 	}
 
 	private createHeader() {
@@ -224,30 +298,37 @@ export class EyeAssemblyScene extends Phaser.Scene {
 			fontSize: '12px',
 			color: '#e9e5ff'
 		});
-		const mascot = this.add.image(338, 66, 'mascot').setDisplaySize(78, 78);
-		const progressLabel = this.add.text(24, 96, '拼装进度', {
-			fontFamily: 'Microsoft YaHei',
-			fontSize: '12px',
-			color: '#d9d4ff'
-		});
-		this.hudProgress = this.add.text(82, 91, '0 / 5', {
-			fontFamily: 'Arial',
-			fontSize: '18px',
-			fontStyle: 'bold',
-			color: '#ffffff'
-		});
-		const scoreLabel = this.add.text(180, 96, '当前得分', {
-			fontFamily: 'Microsoft YaHei',
-			fontSize: '12px',
-			color: '#d9d4ff'
-		});
-		this.hudScore = this.add.text(242, 91, '0000', {
-			fontFamily: 'Arial',
-			fontSize: '18px',
-			fontStyle: 'bold',
-			color: '#ffe28d'
-		});
-		this.headerLayer.add([title, subtitle, mascot, progressLabel, this.hudProgress, scoreLabel, this.hudScore]);
+		const progressLabel = this.add
+			.text(286, 24, '拼装进度', {
+				fontFamily: 'Microsoft YaHei',
+				fontSize: '12px',
+				color: '#d9d4ff'
+			})
+			.setOrigin(1, 0);
+		this.hudProgress = this.add
+			.text(356, 22, '0 / 6', {
+				fontFamily: 'Arial',
+				fontSize: '18px',
+				fontStyle: 'bold',
+				color: '#ffffff'
+			})
+			.setOrigin(1, 0);
+		const scoreLabel = this.add
+			.text(286, 54, '当前得分', {
+				fontFamily: 'Microsoft YaHei',
+				fontSize: '12px',
+				color: '#d9d4ff'
+			})
+			.setOrigin(1, 0);
+		this.hudScore = this.add
+			.text(350, 52, '000', {
+				fontFamily: 'Arial',
+				fontSize: '18px',
+				fontStyle: 'bold',
+				color: '#ffe28d'
+			})
+			.setOrigin(1, 0);
+		this.headerLayer.add([title, subtitle, progressLabel, this.hudProgress, scoreLabel, this.hudScore]);
 	}
 
 	private createEyeDiagram() {
@@ -260,16 +341,16 @@ export class EyeAssemblyScene extends Phaser.Scene {
 			})
 			.setOrigin(0.5);
 
-		this.add.ellipse(199, 422, 286, 30, 0x52607a, 0.07).setDepth(1);
-		this.eyeModel = this.add.image(195, 326, 'eye3d').setDisplaySize(330, 220).setAlpha(0.48).setDepth(2);
+		this.add.ellipse(199, 396, 286, 30, 0x52607a, 0.07).setDepth(1);
+		this.eyeModel = this.add.image(195, 300, 'eye3d').setDisplaySize(330, 220).setAlpha(0.48).setDepth(2);
 
 		const rays = this.add.graphics().setDepth(3);
 		rays.lineStyle(2, 0xffcf45, 0.38);
-		rays.lineBetween(28, 300, 151, 326);
-		rays.lineBetween(28, 326, 286, 326);
-		rays.lineBetween(28, 352, 151, 326);
+		rays.lineBetween(28, 274, 151, 300);
+		rays.lineBetween(28, 300, 286, 300);
+		rays.lineBetween(28, 326, 151, 300);
 		this.add
-			.text(30, 276, '光', {
+			.text(30, 250, '光', {
 				fontFamily: 'Microsoft YaHei',
 				fontSize: '12px',
 				fontStyle: 'bold',
@@ -343,17 +424,20 @@ export class EyeAssemblyScene extends Phaser.Scene {
 
 	private createInfoCard() {
 		this.infoCard = this.add.container(INFO_CARD_X, INFO_CARD_Y).setDepth(35).setAlpha(0);
-		const shadow = this.add.rectangle(3, 5, 338, 118, 0x26335a, 0.18);
-		const bg = this.add.rectangle(0, 0, 338, 118, 0x5045ad, 0.98).setStrokeStyle(2, 0xdcd7ff);
-		const imageBg = this.add.circle(-128, 4, 39, 0xffffff, 0.95).setStrokeStyle(2, 0xbdb4f5);
-		this.infoImage = this.add.image(-128, 4, 'mascot').setDisplaySize(58, 58);
-		this.infoTitle = this.add.text(-80, -43, '', {
+		const shadow = this.add.graphics();
+		shadow.fillStyle(0x26335a, 0.18).fillRoundedRect(-158, -48, 330, 110, 4);
+		const bg = this.add.graphics();
+		bg.fillStyle(0x5045ad, 0.98).fillRoundedRect(-169, -59, 338, 118, 4);
+		bg.strokeRoundedRect(-169, -59, 338, 118, 4);
+		const imageBg = this.add.circle(-120, 4, 39, 0xffffff, 0.95).setStrokeStyle(2, 0xbdb4f5);
+		this.infoImage = this.add.image(-120, 4, 'mascot').setDisplaySize(58, 58);
+		this.infoTitle = this.add.text(-70, -32, '', {
 			fontFamily: 'Microsoft YaHei',
 			fontSize: '14px',
 			fontStyle: 'bold',
 			color: '#ffe28d'
 		});
-		this.infoBody = this.add.text(-80, -15, '', {
+		this.infoBody = this.add.text(-70, -6, '', {
 			fontFamily: 'Microsoft YaHei',
 			fontSize: '12px',
 			color: '#ffffff',
@@ -365,20 +449,15 @@ export class EyeAssemblyScene extends Phaser.Scene {
 
 	private createIntro() {
 		this.introPanel = this.add.container(INTRO_PANEL_X, INTRO_PANEL_Y).setDepth(80);
-		const shade = this.add.rectangle(0, 0, 350, 574, 0xffffff, 0.99).setStrokeStyle(3, 0x7564df);
+		const shade = this.add.graphics();
+		shade.fillStyle(0xffffff, 0.99).fillRoundedRect(-175, -290, 350, 500, 8);
+		shade.lineStyle(1, 0x7564df, 0.42).strokeRoundedRect(-175, -290, 350, 500, 8);
 		const title = this.add
-			.text(0, -247, '先认识一下眼球吧！', {
+			.text(0, -247, '来认识一下眼球吧！', {
 				fontFamily: 'Microsoft YaHei',
 				fontSize: '24px',
 				fontStyle: 'bold',
 				color: '#4f46a5'
-			})
-			.setOrigin(0.5);
-		const sub = this.add
-			.text(0, -214, '它不是一个空心球，而是一台立体的“视觉小相机”', {
-				fontFamily: 'Microsoft YaHei',
-				fontSize: '12px',
-				color: '#68718a'
 			})
 			.setOrigin(0.5);
 		const modelShadow = this.add.ellipse(4, INTRO_MODEL_SHADOW_Y, 274, 26, 0x49536c, 0.18);
@@ -403,31 +482,22 @@ export class EyeAssemblyScene extends Phaser.Scene {
 			ease: 'Sine.InOut'
 		});
 
-		const intro = this.add
-			.text(0, 60, '先记住完整眼球的样子。点击开始后，\n5 个部件会散落，再把它们拖回空缺位置！', {
-				fontFamily: 'Microsoft YaHei',
-				fontSize: '13px',
-				color: '#4b5563',
-				align: 'center',
-				lineSpacing: 7
-			})
-			.setOrigin(0.5);
 		const best = this.add
-			.text(0, 134, `最高分  ${this.best.toString().padStart(3, '0')}`, {
+			.text(0, 44, `历史最高分  ${this.best.toString().padStart(3, '0')}`, {
 				fontFamily: 'Microsoft YaHei',
 				fontSize: '12px',
 				color: '#8b82b8'
 			})
 			.setOrigin(0.5);
-		const start = this.makeButton(0, 180, 218, 50, '开始 · 拆散部件', () => this.startAssembly());
+		const start = this.makeButton(0, 100, 218, 50, '开始 · 拆散部件', () => this.startAssembly());
 		const source = this.add
-			.text(0, 222, '趣味结构示意 · 不替代医学检查或诊断', {
+			.text(0, 165, '趣味结构示意 · 不替代医学检查或诊断', {
 				fontFamily: 'Microsoft YaHei',
 				fontSize: '12px',
 				color: '#9aa2b1'
 			})
 			.setOrigin(0.5);
-		this.introPanel.add([shade, title, sub, modelShadow, model, intro, best, start, source]);
+		this.introPanel.add([shade, title, modelShadow, model, best, start, source]);
 	}
 
 	private startAssembly() {
@@ -435,6 +505,7 @@ export class EyeAssemblyScene extends Phaser.Scene {
 		this.score = 0;
 		this.placed = 0;
 		this.wrong = 0;
+		this.sceneBackground.setVisible(true);
 		this.hudBackground.setVisible(true);
 		this.headerLayer.setVisible(true);
 		this.eyeModel.setAlpha(0.2);
@@ -472,8 +543,11 @@ export class EyeAssemblyScene extends Phaser.Scene {
 			.container(scatter ? part.target.x : home.x, scatter ? part.target.y : home.y)
 			.setSize(108, 76)
 			.setDepth(20);
-		const shadow = this.add.rectangle(3, 5, 108, 76, 0x74809d, 0.25);
-		const card = this.add.rectangle(0, 0, 108, 76, 0xffffff).setStrokeStyle(2, part.color);
+		const shadow = this.add.graphics();
+		shadow.fillStyle(0x74809d, 0.25).fillRoundedRect(-51, -34, 108, 76, 4);
+		const card = this.add.graphics();
+		card.fillStyle(0xffffff, 1).fillRoundedRect(-54, -38, 108, 76, 4);
+		card.lineStyle(2, part.color, 1).strokeRoundedRect(-54, -38, 108, 76, 4);
 		const iconBg = this.add.circle(-28, 0, 26, part.color, 0.12);
 		const icon = this.add.image(-28, 0, part.asset).setDisplaySize(part.iconSize[0], part.iconSize[1]);
 		const label = this.add
@@ -585,7 +659,7 @@ export class EyeAssemblyScene extends Phaser.Scene {
 		});
 		this.placedPartImages.push(placedImage);
 
-		const above = part.id === 'iris' || part.id === 'retina';
+		const above = part.id === 'iris' || part.id === 'body' || part.id === 'retina';
 		const labelY = part.target.y + (above ? 63 : -63);
 		const label = this.add.container(part.target.x, labelY).setDepth(12);
 		const bg = this.add.rectangle(0, 0, 67, 24, 0xffffff, 0.96).setStrokeStyle(2, part.color);
@@ -767,7 +841,7 @@ export class EyeAssemblyScene extends Phaser.Scene {
 			})
 			.setOrigin(0.5);
 		const stats = this.add
-			.text(0, 29, `成功拼装  ${this.placed} / 5\n问答正确  ${this.quizCorrect} / 3\n最高纪录  ${this.best}`, {
+			.text(0, 29, `成功拼装  ${this.placed} / 6\n问答正确  ${this.quizCorrect} / 3\n最高纪录  ${this.best}`, {
 				fontFamily: 'Microsoft YaHei',
 				fontSize: '14px',
 				color: '#596174',
@@ -786,10 +860,11 @@ export class EyeAssemblyScene extends Phaser.Scene {
 			.setOrigin(0.5);
 		const restart = this.makeButton(0, 190, 210, 52, '再看一次眼球组装', () => {
 			panel.destroy(true);
-			if (AUTO_START_FOR_TESTING) {
+			if (AUTO_START_FOR_DEBUG) {
 				this.startAssembly();
 				return;
 			}
+			this.sceneBackground.setVisible(false);
 			this.hudBackground.setVisible(false);
 			this.headerLayer.setVisible(false);
 			this.introPanel.setVisible(true).setAlpha(1);
@@ -808,18 +883,23 @@ export class EyeAssemblyScene extends Phaser.Scene {
 
 	private updateHud() {
 		this.hudProgress.setText(`${this.placed} / 5`);
-		this.hudScore.setText(this.score.toString().padStart(4, '0'));
+		this.hudScore.setText(this.score.toString().padStart(3, '0'));
 	}
 
 	private makeButton(x: number, y: number, width: number, height: number, text: string, onClick: () => void) {
 		const button = this.add.container(x, y).setSize(width, height);
-		const shadow = this.add.rectangle(2, 4, width, height, 0x3c347c, 0.24);
-		const bg = this.add.rectangle(0, 0, width, height, 0x6d5bd7).setStrokeStyle(2, 0xc8c0ff);
-		const shine = this.add.rectangle(0, -height * 0.26, width - 8, 2, 0xffffff, 0.2);
+		const radius = 8;
+		const shadow = this.add.graphics();
+		shadow.fillStyle(0x3c347c, 0.24);
+		shadow.fillRoundedRect(-width / 2 + 4, -height / 2 + 5, width - 2, height - 2, radius);
+		const bg = this.add.graphics();
+		bg.fillStyle(0x6d5bd7, 1);
+		bg.fillRoundedRect(-width / 2, -height / 2, width, height, radius);
+		bg.lineStyle(2, 0xc8c0ff, 1);
 		const label = this.add
 			.text(0, 0, text, { fontFamily: 'Microsoft YaHei', fontSize: '15px', fontStyle: 'bold', color: '#ffffff' })
 			.setOrigin(0.5);
-		button.add([shadow, bg, shine, label]).setInteractive({ useHandCursor: true });
+		button.add([shadow, bg, label]).setInteractive({ useHandCursor: true });
 		button.on('pointerdown', () => button.setScale(0.97));
 		button.on('pointerup', () => {
 			button.setScale(1);
