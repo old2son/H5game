@@ -21,6 +21,13 @@ interface EyePart {
 	clue: string;
 }
 
+interface QuizItem {
+	question: string;
+	options: string[];
+	answer: number;
+	score: number;
+}
+
 const PARTS: EyePart[] = [
 	{
 		id: 'cornea',
@@ -29,10 +36,10 @@ const PARTS: EyePart[] = [
 		asset: 'part-cornea',
 		iconSize: [46, 52],
 		placedSize: [112, 132],
-		placedOffset: [25, 0],
+		placedOffset: [33, 0],
 		placedAlpha: 0.95,
 		placedDepth: 7,
-		target: new Phaser.Math.Vector2(70, 300),
+		target: new Phaser.Math.Vector2(62, 300),
 		clue: '透明小圆顶',
 		fact: '角膜像透明小窗，是光线进入眼睛的第一站，还能帮助光线聚焦。'
 	},
@@ -69,10 +76,10 @@ const PARTS: EyePart[] = [
 		asset: 'part-body',
 		iconSize: [58, 58],
 		placedSize: [126, 168],
-		placedOffset: [0, 0],
+		placedOffset: [-20, 0],
 		placedAlpha: 0.52,
 		placedDepth: 6,
-		target: new Phaser.Math.Vector2(218, 300),
+		target: new Phaser.Math.Vector2(208, 300),
 		clue: '透明凝胶',
 		fact: '玻璃体像透明果冻，填满眼球中间的大空间，帮助眼球保持圆润形状，并让光线顺利通过。'
 	},
@@ -83,11 +90,11 @@ const PARTS: EyePart[] = [
 		asset: 'part-retina',
 		iconSize: [54, 42],
 		placedSize: [248, 188],
-		placedOffset: [-80, 0],
+		placedOffset: [-55, 30],
 		placedAlpha: 0.68,
 		placedDepth: 5,
 		placedBlendMode: Phaser.BlendModes.MULTIPLY,
-		target: new Phaser.Math.Vector2(292, 300),
+		target: new Phaser.Math.Vector2(255, 270),
 		clue: '感光屏幕',
 		fact: '视网膜像相机的感光屏幕，把光转换成大脑能读懂的电信号。'
 	},
@@ -98,11 +105,11 @@ const PARTS: EyePart[] = [
 		asset: 'part-optic',
 		iconSize: [58, 38],
 		placedSize: [82, 42],
-		placedOffset: [-20, 20],
+		placedOffset: [-22, -3],
 		placedAlpha: 0.96,
 		placedDepth: 10,
 		placedAngle: 24,
-		target: new Phaser.Math.Vector2(344, 300),
+		target: new Phaser.Math.Vector2(332, 320),
 		clue: '信号电缆',
 		fact: '视神经像信号电缆，把视网膜产生的视觉信号送往大脑。'
 	}
@@ -113,10 +120,38 @@ const QUIZ = [
 		question: '哪一部分像相机光圈一样，\n控制进入眼睛的光量？',
 		options: ['视网膜', '虹膜', '视神经'],
 		answer: 1,
-		score: 15
+		score: 10
 	},
-	{ question: '光线最后到达哪里，\n才会被转换成电信号？', options: ['视网膜', '角膜', '巩膜'], answer: 0, score: 15 },
-	{ question: '谁像“信号电缆”，\n把视觉信号送往大脑？', options: ['晶状体', '虹膜', '视神经'], answer: 2, score: 20 }
+	{
+		question: '光线最后到达哪里，\n才会被转换成电信号？',
+		options: ['视网膜', '角膜', '巩膜'],
+		answer: 0,
+		score: 10
+	},
+	{
+		question: '谁像“信号电缆”，\n把视觉信号送往大脑？',
+		options: ['晶状体', '虹膜', '视神经'],
+		answer: 2,
+		score: 10
+	},
+	{
+		question: '眼睛最外层的透明小窗，\n帮助光线进入并聚焦的是？',
+		options: ['角膜', '玻璃体', '视网膜'],
+		answer: 0,
+		score: 10
+	},
+	{
+		question: '哪一部分像会变形的小镜片，\n帮助我们看清远近物体？',
+		options: ['虹膜', '晶状体', '视神经'],
+		answer: 1,
+		score: 10
+	},
+	{
+		question: '眼球内部像透明果冻一样，\n填充空间并帮助保持眼球形状的是？',
+		options: ['玻璃体', '晶状体', '虹膜'],
+		answer: 0,
+		score: 10
+	}
 ];
 
 const INFO_CARD_X = 195;
@@ -182,6 +217,7 @@ const SCENE_DECOR_CIRCLES = [
 ] as const;
 
 const AUTO_START_FOR_DEBUG = true;
+const AUTO_COMPLETE_FOR_DEBUG = true;
 
 export class EyeAssemblyScene extends Phaser.Scene {
 	private state: GameState = 'intro';
@@ -209,6 +245,7 @@ export class EyeAssemblyScene extends Phaser.Scene {
 	private introPanel!: Phaser.GameObjects.Container;
 	private quizPanel?: Phaser.GameObjects.Container;
 	private resultPanel?: Phaser.GameObjects.Container;
+	private quizList: QuizItem[] = [];
 
 	constructor() {
 		super('eye-assembly');
@@ -216,6 +253,9 @@ export class EyeAssemblyScene extends Phaser.Scene {
 
 	preload() {
 		this.load.image('mascot', 'assets/bright-eyes-mascot.png');
+		this.load.image('calm', 'assets/calm.png');
+		this.load.image('smile', 'assets/smile.png');
+		this.load.image('laugh', 'assets/laugh.png');
 		this.load.image('eye3d', 'assets/eye-3d-cutaway.png');
 		this.load.image('part-cornea', 'assets/part-cornea-3d.png');
 		this.load.image('part-iris', 'assets/part-iris-3d.png');
@@ -241,6 +281,12 @@ export class EyeAssemblyScene extends Phaser.Scene {
 		if (AUTO_START_FOR_DEBUG) {
 			this.introPanel.setVisible(false).setAlpha(0);
 			this.time.delayedCall(0, () => this.startAssembly());
+		}
+		if (AUTO_COMPLETE_FOR_DEBUG) {
+			this.time.delayedCall(0, () => {
+				this.state = 'assemble';
+				this.showAssemblyComplete();
+			});
 		}
 	}
 
@@ -358,11 +404,11 @@ export class EyeAssemblyScene extends Phaser.Scene {
 			})
 			.setDepth(4);
 		[0, 1, 2].forEach((index) => {
-			const dot = this.add.circle(28, 300 + index * 26, 4, 0xffd44f, 0.75).setDepth(4);
+			const dot = this.add.circle(28, 274 + index * 26, 4, 0xffd44f, 0.75).setDepth(4);
 			this.tweens.add({
 				targets: dot,
 				x: index === 1 ? 286 : 151,
-				y: 326,
+				y: 300,
 				alpha: { from: 0.18, to: 0.9 },
 				duration: 1450 + index * 170,
 				delay: index * 260,
@@ -375,7 +421,7 @@ export class EyeAssemblyScene extends Phaser.Scene {
 		this.targetLayer = this.add.container(0, 0).setDepth(8);
 		PARTS.forEach((part, index) => {
 			const marker = this.add.container(part.target.x, part.target.y);
-			const ring = this.createDashedRing(22, 0xf8fbff, 0.58, 0xc6d0e7, 0.9, 2);
+			const ring = this.createDashedRing(19, 0xf8fbff, 0.58, 0xc6d0e7, 0.9, 2);
 			const number = this.add
 				.text(0, 0, String(index + 1), {
 					fontFamily: 'Arial',
@@ -533,7 +579,7 @@ export class EyeAssemblyScene extends Phaser.Scene {
 		this.tweens.add({ targets: this.targetLayer, alpha: 1, duration: 320, delay: 220 });
 		this.time.delayedCall(1450, () => {
 			this.state = 'assemble';
-			this.showMessage('部件已经散开啦！观察形状，把它们拖回眼球的空缺位置。');
+			this.showMessage('部件已经散开啦！观察形状，把它们拖回眼球的空缺位置。', 2400);
 		});
 		this.updateHud();
 	}
@@ -605,7 +651,7 @@ export class EyeAssemblyScene extends Phaser.Scene {
 		if (this.state !== 'assemble' || !token.active) return;
 		const part = token.getData('part') as EyePart;
 		const distance = Phaser.Math.Distance.Between(token.x, token.y, part.target.x, part.target.y);
-		if (distance <= 68) {
+		if (distance <= 50) {
 			token.disableInteractive();
 			this.tweens.add({
 				targets: token,
@@ -685,7 +731,7 @@ export class EyeAssemblyScene extends Phaser.Scene {
 		this.tweens.add({ targets: this.infoCard, alpha: 1, y: INFO_CARD_Y, duration: 180, yoyo: true, hold: 1450 });
 	}
 
-	private showMessage(text: string) {
+	private showMessage(text: string, holdTime = 1720) {
 		this.infoImage.setTexture('mascot').setDisplaySize(58, 58);
 		this.infoTitle.setText('小瞳提示');
 		this.infoBody.setText(text);
@@ -698,7 +744,7 @@ export class EyeAssemblyScene extends Phaser.Scene {
 			duration: 180,
 			ease: 'Sine.Out',
 			yoyo: true,
-			hold: 1720
+			hold: holdTime
 		});
 	}
 
@@ -715,11 +761,16 @@ export class EyeAssemblyScene extends Phaser.Scene {
 			duration: 420,
 			ease: 'Back.Out'
 		});
-		const panel = this.add.container(195, 469).setDepth(75);
-		const bg = this.add.rectangle(0, 0, 344, 358, 0xffffff, 0.99).setStrokeStyle(3, 0x6d5bd7);
-		const miniEye = this.add.image(0, -105, 'eye3d').setDisplaySize(188, 125);
+		const panel = this.add.container(205, 422).setDepth(75);
+		const bg = this.add.graphics();
+		bg.fillStyle(0xffffff, 0.99);
+		bg.lineStyle(3, 0x6d5bd7, 1);
+		bg.fillRoundedRect(-172, -179, 324, 358, 16);
+		bg.strokeRoundedRect(-172, -179, 324, 358, 16);
+
+		const miniEye = this.add.image(-10, -95, 'eye3d').setDisplaySize(188, 125);
 		const title = this.add
-			.text(0, -27, '眼球组装完成！', {
+			.text(-10, -7, '眼球组装完成！', {
 				fontFamily: 'Microsoft YaHei',
 				fontSize: '23px',
 				fontStyle: 'bold',
@@ -727,7 +778,7 @@ export class EyeAssemblyScene extends Phaser.Scene {
 			})
 			.setOrigin(0.5);
 		const body = this.add
-			.text(0, 29, '光线经过角膜、虹膜和晶状体，\n到达视网膜，再由视神经把信号送给大脑。', {
+			.text(-10, 49, '光线经过角膜、虹膜和晶状体，\n到达视网膜，再由视神经把信号送给大脑。', {
 				fontFamily: 'Microsoft YaHei',
 				fontSize: '12px',
 				color: '#596174',
@@ -735,21 +786,15 @@ export class EyeAssemblyScene extends Phaser.Scene {
 				lineSpacing: 7
 			})
 			.setOrigin(0.5);
-		const button = this.makeButton(0, 111, 210, 52, '进入功能问答', () => {
+		const button = this.makeButton(-10, 121, 210, 52, '进入功能问答', () => {
 			panel.destroy(true);
 			this.startQuiz();
 		});
-		const helper = this.add
-			.text(0, 157, '记住：眼睛和大脑要一起工作，我们才能看见', {
-				fontFamily: 'Microsoft YaHei',
-				fontSize: '12px',
-				color: '#8a92a8'
-			})
-			.setOrigin(0.5);
-		panel.add([bg, miniEye, title, body, button, helper]);
+		panel.add([bg, miniEye, title, body, button]);
 	}
 
 	private startQuiz() {
+		this.quizList = this.shuffleArray(QUIZ, 4);
 		this.quizIndex = 0;
 		this.quizCorrect = 0;
 		this.showQuizQuestion();
@@ -757,16 +802,16 @@ export class EyeAssemblyScene extends Phaser.Scene {
 
 	private showQuizQuestion() {
 		this.quizPanel?.destroy(true);
-		if (this.quizIndex >= QUIZ.length) {
+		if (this.quizIndex >= this.quizList.length) {
 			this.showResult();
 			return;
 		}
-		const item = QUIZ[this.quizIndex];
+		const item = this.quizList[this.quizIndex];
 		const panel = this.add.container(195, 440).setDepth(76);
 		const bg = this.add.rectangle(0, 0, 346, 440, 0xffffff, 0.99).setStrokeStyle(3, 0x6d5bd7);
 		const eye = this.add.image(0, -157, 'eye3d').setDisplaySize(128, 85);
 		const progress = this.add
-			.text(0, -100, `功能问答  ${this.quizIndex + 1} / ${QUIZ.length}`, {
+			.text(0, -100, `功能问答  ${this.quizIndex + 1} / ${this.quizList.length}`, {
 				fontFamily: 'Microsoft YaHei',
 				fontSize: '13px',
 				color: '#7569b1'
@@ -790,19 +835,11 @@ export class EyeAssemblyScene extends Phaser.Scene {
 			);
 			panel.add(answer);
 		});
-		const helper = this.add
-			.text(0, 200, '回想刚才的 3D 模型，选出正确答案', {
-				fontFamily: 'Microsoft YaHei',
-				fontSize: '12px',
-				color: '#9aa2b1'
-			})
-			.setOrigin(0.5);
-		panel.add(helper);
 		this.quizPanel = panel;
 	}
 
 	private answerQuiz(index: number) {
-		const item = QUIZ[this.quizIndex];
+		const item = this.quizList[this.quizIndex];
 		if (index === item.answer) {
 			this.quizCorrect += 1;
 			this.score += item.score;
@@ -822,8 +859,8 @@ export class EyeAssemblyScene extends Phaser.Scene {
 		localStorage.setItem('eye-anatomy-best', String(this.best));
 		const panel = this.add.container(195, 444).setDepth(78);
 		const bg = this.add.rectangle(0, 0, 344, 502, 0xffffff, 0.99).setStrokeStyle(3, 0x6d5bd7);
-		const eye = this.add.image(0, -178, 'eye3d').setDisplaySize(185, 123);
-		const mascot = this.add.image(118, -186, 'mascot').setDisplaySize(67, 67);
+		const img = this.add.image(0, -186, this.score >= 90 ? 'laugh' : this.score >= 70 ? 'smile' : 'calm').setDisplaySize(67, 67);
+
 		const title = this.add
 			.text(0, -93, '眼球结构小专家', {
 				fontFamily: 'Microsoft YaHei',
@@ -841,7 +878,7 @@ export class EyeAssemblyScene extends Phaser.Scene {
 			})
 			.setOrigin(0.5);
 		const stats = this.add
-			.text(0, 29, `成功拼装  ${this.placed} / 6\n问答正确  ${this.quizCorrect} / 3\n最高纪录  ${this.best}`, {
+			.text(0, 29, `成功拼装  ${this.placed} / ${PARTS.length}\n问答正确  ${this.quizCorrect} / ${this.quizList.length}\n最高纪录  ${this.best}`, {
 				fontFamily: 'Microsoft YaHei',
 				fontSize: '14px',
 				color: '#596174',
@@ -877,7 +914,7 @@ export class EyeAssemblyScene extends Phaser.Scene {
 				color: '#a0a6b4'
 			})
 			.setOrigin(0.5);
-		panel.add([bg, eye, mascot, title, score, stats, fact, restart, note]);
+		panel.add([bg, img, title, score, stats, fact, restart, note]);
 		this.resultPanel = panel;
 	}
 
@@ -907,5 +944,17 @@ export class EyeAssemblyScene extends Phaser.Scene {
 		});
 		button.on('pointerout', () => button.setScale(1));
 		return button;
+	}
+
+	private shuffleArray<T>(array: T[], count: number): T[] {
+		const result = [...array]; // 不修改原数组
+
+		for (let i = result.length - 1; i > 0; i--) {
+			const j = Math.floor(Math.random() * (i + 1));
+
+			[result[i], result[j]] = [result[j], result[i]];
+		}
+
+		return result.slice(0, count);
 	}
 }
