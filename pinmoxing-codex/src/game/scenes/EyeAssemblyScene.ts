@@ -28,6 +28,16 @@ interface QuizItem {
 	score: number;
 }
 
+// 问答选项按钮：root 用来挂交互，paint 用来在答题后改底色
+type QuizOptionView = {
+	root: Phaser.GameObjects.Container;
+	paint: (fill: number) => void;
+};
+
+const QUIZ_OPTION_FILL = 0x6d5bd7;
+const QUIZ_OPTION_RIGHT = 0x2fa96b;
+const QUIZ_OPTION_WRONG = 0xd9503f;
+
 const PARTS: EyePart[] = [
 	{
 		id: 'cornea',
@@ -225,7 +235,7 @@ const SCENE_DECOR_CIRCLES = [
 ] as const;
 
 const AUTO_START_FOR_DEBUG = true;
-const AUTO_COMPLETE_FOR_DEBUG = false;
+const AUTO_COMPLETE_FOR_DEBUG = true;
 const AUTO_STARTQUIZ_FOR_DEBUG = false;
 const AUTO_SHOWRESULT_FOR_DEBUG = false;
 
@@ -255,8 +265,14 @@ export class EyeAssemblyScene extends Phaser.Scene {
 	private introPanel!: Phaser.GameObjects.Container;
 	private quizPanel?: Phaser.GameObjects.Container;
 	private resultPanel?: Phaser.GameObjects.Container;
+	// 组装完成后压暗全屏的遮罩：一直留到玩家重新开始一局才撤掉
+	private completeShade?: Phaser.GameObjects.Rectangle;
 	private closeButton!: Phaser.GameObjects.Text;
 	private quizList: QuizItem[] = [];
+	// 本题已作答、下一题还没渲染出来时锁住答题，避免重复计分或一次跳两题
+	private answering = false;
+	// 当前这一题的选项按钮，答题后用来染色
+	private quizOptions: QuizOptionView[] = [];
 
 	constructor() {
 		super('eye-assembly');
@@ -579,6 +595,7 @@ export class EyeAssemblyScene extends Phaser.Scene {
 	}
 
 	private startAssembly() {
+		this.clearCompleteShade();
 		this.state = 'scatter';
 		this.score = 0;
 		this.placed = 0;
@@ -803,6 +820,16 @@ export class EyeAssemblyScene extends Phaser.Scene {
 			ease: 'Back.Out'
 		});
 		const panel = this.add.container(205, 422).setDepth(75);
+		// 全屏遮罩：压暗背景，让完成后的问答、结果阶段也保持聚焦。
+		// 刻意不加交互，避免挡住面板按钮和问答选项；它会一直留在场景里，
+		// 直到玩家重新开始一局（startAssembly / 回到开场）才由 clearCompleteShade 撤掉。
+		this.clearCompleteShade();
+		const shade = this.add
+			.rectangle(VIEW_WIDTH / 2, VIEW_HEIGHT / 2, VIEW_WIDTH, VIEW_HEIGHT, 0x000000, 0.67)
+			.setDepth(74);
+		shade.setAlpha(0);
+		this.tweens.add({ targets: shade, alpha: 1, duration: 220, ease: 'Sine.Out' });
+		this.completeShade = shade;
 		const bg = this.add.graphics();
 		bg.fillStyle(0xffffff, 0.99);
 		bg.lineStyle(3, 0x6d5bd7, 1);
@@ -834,6 +861,11 @@ export class EyeAssemblyScene extends Phaser.Scene {
 		panel.add([bg, miniEye, title, body, button]);
 	}
 
+	private clearCompleteShade() {
+		this.completeShade?.destroy();
+		this.completeShade = undefined;
+	}
+
 	private startQuiz() {
 		this.quizList = this.shuffleArray(QUIZ, 4);
 		this.quizIndex = 0;
@@ -843,6 +875,9 @@ export class EyeAssemblyScene extends Phaser.Scene {
 
 	private showQuizQuestion() {
 		this.quizPanel?.destroy(true);
+		this.quizOptions = [];
+		// 新题目在这里渲染，答题锁随之放开
+		this.answering = false;
 		if (AUTO_SHOWRESULT_FOR_DEBUG) {
 			this.showResult();
 			return;
@@ -880,22 +915,72 @@ export class EyeAssemblyScene extends Phaser.Scene {
 			.setOrigin(0.5);
 		panel.add([bg, eye, progress, question]);
 		item.options.forEach((option, i) => {
-			const answer = this.makeButton(-10, 72 + i * 62, 272, 48, `${String.fromCharCode(65 + i)}. ${option}`, () =>
+			const view = this.makeQuizOption(-10, 72 + i * 62, 272, 48, `${String.fromCharCode(65 + i)}. ${option}`, () =>
 				this.answerQuiz(i)
 			);
-			panel.add(answer);
+			panel.add(view.root);
+			this.quizOptions.push(view);
 		});
 		this.quizPanel = panel;
 	}
 
+	// 问答选项按钮：和 makeButton 同样的外观，但把"改底色"暴露出来，
+	// 这样答题后可以直接把选项染成绿/红，而不用弹提示卡。
+	private makeQuizOption(
+		x: number,
+		y: number,
+		width: number,
+		height: number,
+		text: string,
+		onClick: () => void
+	): QuizOptionView {
+		const root = this.add.container(x, y).setSize(width, height);
+		const radius = 8;
+		const shadow = this.add.graphics();
+		shadow.fillStyle(0x3c347c, 0.24);
+		shadow.fillRoundedRect(-width / 2 + 4, -height / 2 + 5, width - 2, height - 2, radius);
+		const bg = this.add.graphics();
+		const label = this.add
+			.text(0, 0, text, {
+				fontFamily: 'Microsoft YaHei',
+				fontSize: '15px',
+				fontStyle: 'bold',
+				color: '#ffffff'
+			})
+			.setOrigin(0.5);
+		const paint = (fill: number) => {
+			bg.clear();
+			bg.fillStyle(fill, 1);
+			bg.fillRoundedRect(-width / 2, -height / 2, width, height, radius);
+			bg.lineStyle(2, 0xffffff, 0.72);
+			bg.strokeRoundedRect(-width / 2, -height / 2, width, height, radius);
+		};
+		paint(QUIZ_OPTION_FILL);
+		root.add([shadow, bg, label]).setInteractive({ useHandCursor: true });
+		root.on('pointerdown', () => root.setScale(0.97));
+		root.on('pointerup', () => {
+			root.setScale(1);
+			onClick();
+		});
+		root.on('pointerout', () => root.setScale(1));
+		return { root, paint };
+	}
+
 	private answerQuiz(index: number) {
+		// 这一题已经答过了：等下一题渲染出来（showQuizQuestion 解锁）之前忽略点击
+		if (this.answering) return;
+		this.answering = true;
 		const item = this.quizList[this.quizIndex];
+		const chosen = this.quizOptions[index];
+		const correct = this.quizOptions[item.answer];
 		if (index === item.answer) {
 			this.quizCorrect += 1;
 			this.score += item.score;
-			this.showMessage('回答正确！眼球各部分需要一起合作，才能让我们看见。');
+			chosen?.paint(QUIZ_OPTION_RIGHT);
 		} else {
-			this.showMessage(`正确答案是“${item.options[item.answer]}”，记住它的功能哦！`);
+			// 选错：自己变红，同时把正确项高亮成绿色
+			chosen?.paint(QUIZ_OPTION_WRONG);
+			correct?.paint(QUIZ_OPTION_RIGHT);
 		}
 		this.updateHud();
 		this.quizIndex += 1;
@@ -959,6 +1044,8 @@ export class EyeAssemblyScene extends Phaser.Scene {
 			.setOrigin(0.5);
 		const restart = this.makeButton(-10, 190, 210, 52, '再看一次眼球组装', () => {
 			panel.destroy(true);
+			// 重新游玩才撤掉完成后的遮罩
+			this.clearCompleteShade();
 			if (AUTO_START_FOR_DEBUG) {
 				this.startAssembly();
 				return;
