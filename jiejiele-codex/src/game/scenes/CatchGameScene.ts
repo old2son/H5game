@@ -89,6 +89,10 @@ const MASCOT_SETTLE_SPEED = 22;
 const MASCOT_SETTLE_AMPLITUDE = 0.16;
 const MASCOT_SETTLE_TILT = 4;
 const MASCOT_FULL_SPEED_PER_MS = PLAYER_MOVE_SPEED / 1000;
+// 静止时的上下轻晃：站着不动也有呼吸感，和待机呼吸帧叠在一起。
+// 只在待机时生效，走路帧自带弹跳，余震期间也先让位给挤压。
+const MASCOT_IDLE_BOB_PX = 4;
+const MASCOT_IDLE_BOB_SPEED = 3.2;
 
 const GOOD_ITEMS: ItemDefinition[] = [
 	{
@@ -237,6 +241,10 @@ export class CatchGameScene extends Phaser.Scene {
 	private settleElapsed = -1;
 	// 停下前的移动速度（像素/毫秒），用来决定余震晃多厉害
 	private walkSpeed = 0;
+	// 待机轻晃的计时
+	private idleElapsed = 0;
+	// 角色支点的原始 y，上下轻晃时以它为基准
+	private mascotPivotBaseY = 0;
 	private hdTexts = new WeakSet<Phaser.GameObjects.Text>();
 	private cloudLayer!: Phaser.GameObjects.Graphics;
 	private clouds: CloudState[] = [];
@@ -471,6 +479,7 @@ export class CatchGameScene extends Phaser.Scene {
 		const mascot = this.makeMascotWithBasket(0, 0, 96);
 		this.playerMascot = mascot.body;
 		this.mascotPivot = mascot.pivot;
+		this.mascotPivotBaseY = mascot.pivot.y;
 		this.player.add([shadow, mascot.container]);
 	}
 
@@ -714,6 +723,7 @@ export class CatchGameScene extends Phaser.Scene {
 		this.walkSpeed = 0;
 		this.usingWalkFrames = false;
 		this.settleElapsed = -1;
+		this.idleElapsed = 0;
 		this.resetSettlePose();
 		this.playerMascot?.setFlipX(false);
 		this.updatePlayerPose(0, 0);
@@ -796,10 +806,13 @@ export class CatchGameScene extends Phaser.Scene {
 				this.usingWalkFrames = true;
 				this.walkFrame = -1;
 			}
-			// 走路帧本身带形变，余震的缩放不能叠在上面
+			// 走路帧本身带形变，余震的缩放和待机轻晃都不能叠在上面
+			this.idleElapsed = 0;
 			if (this.settleElapsed >= 0) {
 				this.settleElapsed = -1;
 				this.resetSettlePose();
+			} else if (this.mascotPivot && this.mascotPivot.y !== this.mascotPivotBaseY) {
+				this.mascotPivot.y = this.mascotPivotBaseY;
 			}
 			const frame = Math.floor(this.walkPhase) % MASCOT_WALK_FRAME_COUNT;
 			if (frame !== this.walkFrame) {
@@ -811,9 +824,24 @@ export class CatchGameScene extends Phaser.Scene {
 
 		const justStopped = this.usingWalkFrames;
 		this.usingWalkFrames = false;
-		if (body.anims.currentAnim?.key !== MASCOT_IDLE_ANIM) body.play(MASCOT_IDLE_ANIM, true);
+		// 注意：anims.stop() 只会把 isPlaying 置假，不会清空 currentAnim。
+		// 所以不能拿 currentAnim.key 判断要不要重播待机，否则从走路切回待机时会被误判成
+		// "已经在播待机"，角色就卡在最后一帧行走图上。这里用 isPlaying 判断。
+		if (justStopped || !body.anims.isPlaying) body.play(MASCOT_IDLE_ANIM, true);
 		if (justStopped) this.settleElapsed = 0;
 		this.updateSettlePose(delta);
+		if (this.settleElapsed < 0) this.updateIdleBob(delta);
+		else this.idleElapsed = 0;
+	}
+
+	// 静止时的小幅上下浮动：从 0 开始、起步速度为 0 的正弦，接在余震结束之后不会突跳。
+	private updateIdleBob(delta: number) {
+		const pivot = this.mascotPivot;
+		if (!pivot) return;
+		this.idleElapsed += delta;
+		const seconds = this.idleElapsed / 1000;
+		const bob = MASCOT_IDLE_BOB_PX * 0.5 * (1 - Math.cos(seconds * MASCOT_IDLE_BOB_SPEED));
+		pivot.y = this.mascotPivotBaseY - bob;
 	}
 
 	// 停下后绕着脚底抖几下，幅度指数衰减；抖完把形变归零，别让残值影响下一段行走。
@@ -841,6 +869,7 @@ export class CatchGameScene extends Phaser.Scene {
 		if (!this.mascotPivot) return;
 		this.mascotPivot.setScale(1);
 		this.mascotPivot.setAngle(0);
+		this.mascotPivot.y = this.mascotPivotBaseY;
 	}
 
 	private getPlayerSpeedFactor() {
@@ -1205,7 +1234,7 @@ export class CatchGameScene extends Phaser.Scene {
 				}
 			)
 			.setOrigin(0, 0.5);
-		const badgeCard = this.makeRoundedPanel(97, -142, 113, 113, 18, 0xffffff, 1, 0xe4edf4, 1, 1);
+		const badgeCard = this.makeRoundedPanel(97, -142, 123, 113, 18, 0xffffff, 1, 0xe4edf4, 1, 1);
 		const badgeLevel = this.add
 			.text(97, -177, `${level}风险`, {
 				fontFamily: 'Microsoft YaHei',

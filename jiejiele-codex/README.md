@@ -46,6 +46,8 @@ python tools/generate-walk-frames.py
   全速 750px/s 时约 14 帧/秒，速度越慢步子越慢。
 - 停下来时角色会绕脚底抖几下（约 0.7s 的指数衰减挤压，幅度随停下前的速度变化），
   不会一停就僵住。参数是 `MASCOT_SETTLE_*`。
+- 完全静止时角色还会持续上下轻晃（约 2 秒一个来回、最高 4px），配合待机呼吸帧，
+  站着也不会像一张贴纸。参数是 `MASCOT_IDLE_BOB_*`。
 - 想单独看帧序列可以加 `--preview`，会在 `tools/preview/` 生成对照图和 GIF（默认不生成）。
 
 换了新的站立立绘后重跑脚本即可，帧数、幅度都在脚本顶部的 `WALK_FRAMES` / `IDLE_FRAMES` 里调。
