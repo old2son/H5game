@@ -3,6 +3,7 @@ require.js
 jquery.js
 .idea
 dist
+jiejiele-codex/tools/preview
 
 # Env
 .env

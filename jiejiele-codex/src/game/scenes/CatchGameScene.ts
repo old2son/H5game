@@ -39,6 +39,12 @@ type CloudState = {
 	parts: CloudPart[];
 };
 
+type MascotFigure = {
+	container: Phaser.GameObjects.Container;
+	body: Phaser.GameObjects.Sprite;
+	pivot: Phaser.GameObjects.Container;
+};
+
 const WIDTH = 390;
 const HEIGHT = 844;
 const RENDER_SCALE = Math.min(3, Math.max(2, Math.ceil(window.devicePixelRatio || 1)));
@@ -49,6 +55,40 @@ const GAME_OVER_TOAST_DELAY = 1850;
 const PLAYER_MOVE_SPEED = 750;
 const PLAYER_SLOW_DURATION = 2000;
 const PLAYER_SLOW_FACTOR = 0.22;
+
+// 角色只有一张正面站立图，走路帧是由 tools/generate-walk-frames.py 从这张图派生出来的：
+// 12 帧横排的 spritesheet，每帧 320x320，帧 0-7 是向右走的循环，帧 8-11 是待机呼吸。
+// 向左走不需要第二套图，直接 sprite.setFlipX(true) 水平翻转即可。
+const MASCOT_SHEET_KEY = 'orange-eye-mascot-walk';
+const MASCOT_FRAME_SIZE = 320;
+const MASCOT_WALK_FRAME_COUNT = 8;
+const MASCOT_IDLE_START_FRAME = 8;
+const MASCOT_IDLE_END_FRAME = 11;
+const MASCOT_IDLE_ANIM = 'mascot-idle';
+// 生成脚本里角色只占帧宽的 86%，剩下的留白是给旋转和弹跳用的；
+// 这里按同样比例放大显示尺寸，角色在游戏里的实际大小和原来完全一致。
+const MASCOT_ART_FRACTION = 0.86;
+// 行走帧由"走了多远"驱动，而不是按时间空转：
+// 每走 MASCOT_STRIDE_PX 逻辑像素推进一帧。这样慢速挪动时步子也跟着放慢，
+// 不会出现"挪一点点就重播一遍动画"的抽搐感（全速 750px/s 时约 14 帧/秒）。
+const MASCOT_STRIDE_PX = 52;
+// 小于这个位移就当没动（浮点抖动）。
+const MASCOT_STEP_EPSILON = 0.01;
+// 手指/方向键停下来后，仍然继续迈几步再切回待机，避免一停一顿反复切换。
+const MASCOT_WALK_COAST_MS = 140;
+// 只有超过这个速度才翻转朝向，避免原地小幅抖动时左右乱翻。
+const MASCOT_FLIP_EPSILON = 0.8;
+// 角色脚底相对精灵中心的位置（占显示尺寸的比例）。生成脚本里角色高 0.86 * 486/600 ≈ 0.81 个显示尺寸，
+// 居中对齐后底边就是一半。
+const MASCOT_BASELINE_RATIO = 0.405;
+// 停下来的"余震"：绕脚底做一段指数衰减的挤压抖动，避免角色说停就僵住。
+// 幅度和停下前的速度挂钩，慢慢挪停下来的只轻轻晃一下，冲刺急停才晃得厉害。
+const MASCOT_SETTLE_MS = 700;
+const MASCOT_SETTLE_DECAY = 0.22;
+const MASCOT_SETTLE_SPEED = 22;
+const MASCOT_SETTLE_AMPLITUDE = 0.16;
+const MASCOT_SETTLE_TILT = 4;
+const MASCOT_FULL_SPEED_PER_MS = PLAYER_MOVE_SPEED / 1000;
 
 const GOOD_ITEMS: ItemDefinition[] = [
 	{
@@ -186,6 +226,17 @@ export class CatchGameScene extends Phaser.Scene {
 	private timeBar!: Phaser.GameObjects.Graphics;
 	private toast?: Phaser.GameObjects.Container;
 	private cursors?: Phaser.Types.Input.Keyboard.CursorKeys;
+	private playerMascot?: Phaser.GameObjects.Sprite;
+	private mascotPivot?: Phaser.GameObjects.Container;
+	// 行走帧的相位（单位是"帧"，0 ~ MASCOT_WALK_FRAME_COUNT），由位移累加而来
+	private walkPhase = 0;
+	private walkFrame = -1;
+	private walkCoast = 0;
+	private usingWalkFrames = false;
+	// 停下后的余震计时，-1 表示没有在震
+	private settleElapsed = -1;
+	// 停下前的移动速度（像素/毫秒），用来决定余震晃多厉害
+	private walkSpeed = 0;
 	private hdTexts = new WeakSet<Phaser.GameObjects.Text>();
 	private cloudLayer!: Phaser.GameObjects.Graphics;
 	private clouds: CloudState[] = [];
@@ -199,7 +250,10 @@ export class CatchGameScene extends Phaser.Scene {
 	}
 
 	preload() {
-		this.load.image('orange-eye-mascot-original', 'assets/orange-eye-mascot-original.png');
+		this.load.spritesheet(MASCOT_SHEET_KEY, 'assets/orange-eye-mascot-walk.png', {
+			frameWidth: MASCOT_FRAME_SIZE,
+			frameHeight: MASCOT_FRAME_SIZE
+		});
 		this.load.image('icon-relax', 'assets/icon-relax.png');
 		this.load.image('icon-explore', 'assets/icon-explore.png');
 		this.load.image('icon-sleep', 'assets/icon-sleep.png');
@@ -216,6 +270,7 @@ export class CatchGameScene extends Phaser.Scene {
 		this.cameras.main.setZoom(RENDER_SCALE).centerOn(WIDTH / 2, HEIGHT / 2);
 		this.drawWorld();
 		this.createHud();
+		this.createMascotAnimations();
 		this.createPlayer();
 		this.createIntro();
 
@@ -396,17 +451,41 @@ export class CatchGameScene extends Phaser.Scene {
 		this.updateTimer();
 	}
 
+	private createMascotAnimations() {
+		if (this.anims.exists(MASCOT_IDLE_ANIM)) return;
+		this.anims.create({
+			key: MASCOT_IDLE_ANIM,
+			frames: this.anims.generateFrameNumbers(MASCOT_SHEET_KEY, {
+				start: MASCOT_IDLE_START_FRAME,
+				end: MASCOT_IDLE_END_FRAME
+			}),
+			frameRate: 5,
+			repeat: -1,
+			yoyo: true
+		});
+	}
+
 	private createPlayer() {
 		this.player = this.add.container(WIDTH / 2, 190).setDepth(12);
 		const shadow = this.add.ellipse(0, 44, 70, 14, 0x295c4b, 0.2);
 		const mascot = this.makeMascotWithBasket(0, 0, 96);
-		this.player.add([shadow, mascot]);
+		this.playerMascot = mascot.body;
+		this.mascotPivot = mascot.pivot;
+		this.player.add([shadow, mascot.container]);
 	}
 
-	private makeMascotWithBasket(x: number, y: number, size: number) {
+	private makeMascotWithBasket(x: number, y: number, size: number): MascotFigure {
 		const root = this.add.container(x, y);
 		const scale = size / 148;
-		const mascot = this.add.image(0, 0, 'orange-eye-mascot-original').setDisplaySize(size, size);
+		// 角色底边（脚底）在贴图里的位置：帧里角色宽 86%、高 0.86*486/600，
+		// 居中对齐后底边距离精灵中心就是这个高度的一半。余震绕这里做形变，脚底才不会浮起来。
+		const baseline = size * MASCOT_BASELINE_RATIO;
+		const pivot = this.add.container(0, baseline);
+		const body = this.add
+			.sprite(0, -baseline, MASCOT_SHEET_KEY, 0)
+			.setDisplaySize(size / MASCOT_ART_FRACTION, size / MASCOT_ART_FRACTION);
+		body.play(MASCOT_IDLE_ANIM);
+		pivot.add(body);
 		const basketBody = this.add.graphics();
 		const basketHalfWidth = 58 * scale;
 		const basketHalfHeight = 36 * scale;
@@ -439,8 +518,8 @@ export class CatchGameScene extends Phaser.Scene {
 		const basketLine3 = this.add
 			.line(25 * scale, -62 * scale, 0, -9 * scale, 0, 8 * scale, 0xb87532)
 			.setLineWidth(Math.max(1, 2 * scale));
-		root.add([mascot, basketBody, basketHighlight, basketLine1, basketLine2, basketLine3, basketRim, basketInner]);
-		return root;
+		root.add([pivot, basketBody, basketHighlight, basketLine1, basketLine2, basketLine3, basketRim, basketInner]);
+		return { container: root, body, pivot };
 	}
 
 	private createIntro() {
@@ -499,7 +578,7 @@ export class CatchGameScene extends Phaser.Scene {
 			haloOuter,
 			haloInner,
 			badge,
-			mascot,
+			mascot.container,
 			title,
 			subtitle,
 			good,
@@ -629,6 +708,15 @@ export class CatchGameScene extends Phaser.Scene {
 		this.resultPanel?.destroy(true);
 		this.introPanel.setVisible(false);
 		this.player.setVisible(true).setPosition(WIDTH / 2, 690);
+		this.walkPhase = 0;
+		this.walkFrame = -1;
+		this.walkCoast = 0;
+		this.walkSpeed = 0;
+		this.usingWalkFrames = false;
+		this.settleElapsed = -1;
+		this.resetSettlePose();
+		this.playerMascot?.setFlipX(false);
+		this.updatePlayerPose(0, 0);
 		this.activePointerId = undefined;
 		this.lastPointerX = WIDTH / 2;
 		this.slowedUntil = 0;
@@ -678,9 +766,81 @@ export class CatchGameScene extends Phaser.Scene {
 		if (this.cursors?.left.isDown) this.playerTargetX -= keyboardSpeed;
 		if (this.cursors?.right.isDown) this.playerTargetX += keyboardSpeed;
 		this.playerTargetX = Phaser.Math.Clamp(this.playerTargetX, 60, WIDTH - 60);
+		const previousX = this.player.x;
 		const deltaX = this.playerTargetX - this.player.x;
 		if (Math.abs(deltaX) <= keyboardSpeed) this.player.x = this.playerTargetX;
 		else this.player.x += Math.sign(deltaX) * keyboardSpeed;
+		this.updatePlayerPose(this.player.x - previousX, delta);
+	}
+
+	private updatePlayerPose(stepX: number, delta: number) {
+		const body = this.playerMascot;
+		if (!body) return;
+
+		const distance = Math.abs(stepX);
+		if (distance > MASCOT_STEP_EPSILON) {
+			// 帧相位跟着位移走，走得少就只推进一点点，动画不会反复从头播
+			this.walkCoast = MASCOT_WALK_COAST_MS;
+			this.walkPhase = (this.walkPhase + distance / MASCOT_STRIDE_PX) % MASCOT_WALK_FRAME_COUNT;
+			this.walkSpeed = distance / Math.max(delta, 1);
+			// 贴图只画了朝右的行走帧：往左走时整张图水平翻转，所以不需要第二套资源。
+			// 阈值高一点，原地小幅抖动时朝向不会左右乱跳。
+			if (distance > MASCOT_FLIP_EPSILON) body.setFlipX(stepX < 0);
+		} else if (this.walkCoast > 0) {
+			this.walkCoast = Math.max(0, this.walkCoast - delta);
+		}
+
+		if (this.walkCoast > 0) {
+			if (!this.usingWalkFrames) {
+				body.anims.stop();
+				this.usingWalkFrames = true;
+				this.walkFrame = -1;
+			}
+			// 走路帧本身带形变，余震的缩放不能叠在上面
+			if (this.settleElapsed >= 0) {
+				this.settleElapsed = -1;
+				this.resetSettlePose();
+			}
+			const frame = Math.floor(this.walkPhase) % MASCOT_WALK_FRAME_COUNT;
+			if (frame !== this.walkFrame) {
+				body.setFrame(frame);
+				this.walkFrame = frame;
+			}
+			return;
+		}
+
+		const justStopped = this.usingWalkFrames;
+		this.usingWalkFrames = false;
+		if (body.anims.currentAnim?.key !== MASCOT_IDLE_ANIM) body.play(MASCOT_IDLE_ANIM, true);
+		if (justStopped) this.settleElapsed = 0;
+		this.updateSettlePose(delta);
+	}
+
+	// 停下后绕着脚底抖几下，幅度指数衰减；抖完把形变归零，别让残值影响下一段行走。
+	private updateSettlePose(delta: number) {
+		const pivot = this.mascotPivot;
+		if (!pivot || this.settleElapsed < 0) return;
+		this.settleElapsed += delta;
+		if (this.settleElapsed >= MASCOT_SETTLE_MS) {
+			this.settleElapsed = -1;
+			this.resetSettlePose();
+			return;
+		}
+		const seconds = this.settleElapsed / 1000;
+		const decay = Math.exp(-seconds / MASCOT_SETTLE_DECAY);
+		const wave = Math.sin(seconds * MASCOT_SETTLE_SPEED);
+		const strength = Phaser.Math.Clamp(this.walkSpeed / MASCOT_FULL_SPEED_PER_MS, 0.4, 1.15);
+		const squash = MASCOT_SETTLE_AMPLITUDE * strength * decay * wave;
+		pivot.scaleY = 1 + squash;
+		// 横向反向压一点，近似保持体积，看起来像果冻回弹
+		pivot.scaleX = 1 - squash * 0.6;
+		pivot.angle = MASCOT_SETTLE_TILT * strength * decay * Math.sin(seconds * MASCOT_SETTLE_SPEED * 0.8 + 0.7);
+	}
+
+	private resetSettlePose() {
+		if (!this.mascotPivot) return;
+		this.mascotPivot.setScale(1);
+		this.mascotPivot.setAngle(0);
 	}
 
 	private getPlayerSpeedFactor() {
