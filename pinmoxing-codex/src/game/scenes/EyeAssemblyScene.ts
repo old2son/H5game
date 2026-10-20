@@ -77,7 +77,7 @@ const PARTS: EyePart[] = [
 		iconSize: [58, 58],
 		placedSize: [126, 168],
 		placedOffset: [-20, 0],
-		placedAlpha: 0.52,
+		placedAlpha: 0.9,
 		placedDepth: 6,
 		target: new Phaser.Math.Vector2(208, 300),
 		clue: '透明凝胶',
@@ -91,7 +91,7 @@ const PARTS: EyePart[] = [
 		iconSize: [54, 42],
 		placedSize: [248, 188],
 		placedOffset: [-55, 30],
-		placedAlpha: 0.68,
+		placedAlpha: 0.88,
 		placedDepth: 5,
 		placedBlendMode: Phaser.BlendModes.MULTIPLY,
 		target: new Phaser.Math.Vector2(255, 270),
@@ -114,6 +114,14 @@ const PARTS: EyePart[] = [
 		fact: '视神经像信号电缆，把视网膜产生的视觉信号送往大脑。'
 	}
 ];
+
+const labelOffsets: Record<string, number> = {
+	iris: 63,
+	lens: -52,
+	body: 63,
+	retina: -48,
+	optic: -48
+};
 
 const QUIZ = [
 	{
@@ -217,7 +225,9 @@ const SCENE_DECOR_CIRCLES = [
 ] as const;
 
 const AUTO_START_FOR_DEBUG = true;
-const AUTO_COMPLETE_FOR_DEBUG = true;
+const AUTO_COMPLETE_FOR_DEBUG = false;
+const AUTO_STARTQUIZ_FOR_DEBUG = false;
+const AUTO_SHOWRESULT_FOR_DEBUG = false;
 
 export class EyeAssemblyScene extends Phaser.Scene {
 	private state: GameState = 'intro';
@@ -245,6 +255,7 @@ export class EyeAssemblyScene extends Phaser.Scene {
 	private introPanel!: Phaser.GameObjects.Container;
 	private quizPanel?: Phaser.GameObjects.Container;
 	private resultPanel?: Phaser.GameObjects.Container;
+	private closeButton!: Phaser.GameObjects.Text;
 	private quizList: QuizItem[] = [];
 
 	constructor() {
@@ -287,6 +298,9 @@ export class EyeAssemblyScene extends Phaser.Scene {
 				this.state = 'assemble';
 				this.showAssemblyComplete();
 			});
+		}
+		if (AUTO_STARTQUIZ_FOR_DEBUG) {
+			this.time.delayedCall(0, () => this.startQuiz());
 		}
 	}
 
@@ -352,7 +366,7 @@ export class EyeAssemblyScene extends Phaser.Scene {
 			})
 			.setOrigin(1, 0);
 		this.hudProgress = this.add
-			.text(356, 22, '0 / 6', {
+			.text(356, 22, `0 / ${PARTS.length}}`, {
 				fontFamily: 'Arial',
 				fontSize: '18px',
 				fontStyle: 'bold',
@@ -490,7 +504,25 @@ export class EyeAssemblyScene extends Phaser.Scene {
 			wordWrap: { width: 228, useAdvancedWrap: true },
 			lineSpacing: 5
 		});
-		this.infoCard.add([shadow, bg, imageBg, this.infoImage, this.infoTitle, this.infoBody]);
+
+		// 右上角关闭按钮
+		this.closeButton = this.add
+			.text(151, -43, '×', {
+				fontFamily: 'Microsoft YaHei',
+				fontSize: '24px',
+				color: '#ffffff',
+				fontStyle: 'bold'
+			})
+			.setOrigin(0.5)
+			.setInteractive({ useHandCursor: true })
+			.setVisible(false);
+		this.closeButton.on('pointerdown', () => {
+			this.tweens.killTweensOf(this.infoCard);
+			this.infoCard.setAlpha(0).setY(INFO_CARD_ENTER_Y);
+			this.closeButton.setVisible(false);
+		});
+
+		this.infoCard.add([shadow, bg, imageBg, this.infoImage, this.infoTitle, this.infoBody, this.closeButton]);
 	}
 
 	private createIntro() {
@@ -705,8 +737,7 @@ export class EyeAssemblyScene extends Phaser.Scene {
 		});
 		this.placedPartImages.push(placedImage);
 
-		const above = part.id === 'iris' || part.id === 'body' || part.id === 'retina';
-		const labelY = part.target.y + (above ? 63 : -63);
+		const labelY = part.target.y + (labelOffsets[part.id] ?? -63);
 		const label = this.add.container(part.target.x, labelY).setDepth(12);
 		const bg = this.add.rectangle(0, 0, 67, 24, 0xffffff, 0.96).setStrokeStyle(2, part.color);
 		const text = this.add
@@ -728,7 +759,16 @@ export class EyeAssemblyScene extends Phaser.Scene {
 		this.infoBody.setText(part.fact);
 		this.tweens.killTweensOf(this.infoCard);
 		this.infoCard.setAlpha(0).setY(INFO_CARD_ENTER_Y);
-		this.tweens.add({ targets: this.infoCard, alpha: 1, y: INFO_CARD_Y, duration: 180, yoyo: true, hold: 1450 });
+		// this.tweens.add({ targets: this.infoCard, alpha: 1, y: INFO_CARD_Y, duration: 180, yoyo: true, hold: 1450 });
+
+		this.closeButton.setVisible(true);
+		this.tweens.add({
+			targets: this.infoCard,
+			alpha: 1,
+			y: INFO_CARD_Y,
+			duration: 180,
+			ease: 'Sine.Out'
+		});
 	}
 
 	private showMessage(text: string, holdTime = 1720) {
@@ -737,6 +777,7 @@ export class EyeAssemblyScene extends Phaser.Scene {
 		this.infoBody.setText(text);
 		this.tweens.killTweensOf(this.infoCard);
 		this.infoCard.setAlpha(0).setY(INFO_CARD_ENTER_Y);
+		this.closeButton.setVisible(false);
 		this.tweens.add({
 			targets: this.infoCard,
 			alpha: 1,
@@ -765,8 +806,8 @@ export class EyeAssemblyScene extends Phaser.Scene {
 		const bg = this.add.graphics();
 		bg.fillStyle(0xffffff, 0.99);
 		bg.lineStyle(3, 0x6d5bd7, 1);
-		bg.fillRoundedRect(-172, -179, 324, 358, 16);
-		bg.strokeRoundedRect(-172, -179, 324, 358, 16);
+		bg.fillRoundedRect(-172, -179, 324, 358, 8);
+		bg.strokeRoundedRect(-172, -179, 324, 358, 8);
 
 		const miniEye = this.add.image(-10, -95, 'eye3d').setDisplaySize(188, 125);
 		const title = this.add
@@ -802,23 +843,32 @@ export class EyeAssemblyScene extends Phaser.Scene {
 
 	private showQuizQuestion() {
 		this.quizPanel?.destroy(true);
+		if (AUTO_SHOWRESULT_FOR_DEBUG) {
+			this.showResult();
+			return;
+		}
 		if (this.quizIndex >= this.quizList.length) {
 			this.showResult();
 			return;
 		}
 		const item = this.quizList[this.quizIndex];
-		const panel = this.add.container(195, 440).setDepth(76);
-		const bg = this.add.rectangle(0, 0, 346, 440, 0xffffff, 0.99).setStrokeStyle(3, 0x6d5bd7);
-		const eye = this.add.image(0, -157, 'eye3d').setDisplaySize(128, 85);
+		const panel = this.add.container(205, 422).setDepth(76);
+		const bg = this.add.graphics();
+		bg.fillStyle(0xffffff, 0.99);
+		bg.lineStyle(3, 0x6d5bd7, 1);
+		bg.fillRoundedRect(-172, -179, 324, 440, 8);
+		bg.strokeRoundedRect(-172, -179, 324, 440, 8);
+
+		const eye = this.add.image(-10, -112, 'eye3d').setDisplaySize(128, 85);
 		const progress = this.add
-			.text(0, -100, `功能问答  ${this.quizIndex + 1} / ${this.quizList.length}`, {
+			.text(-10, -50, `功能问答  ${this.quizIndex + 1} / ${this.quizList.length}`, {
 				fontFamily: 'Microsoft YaHei',
 				fontSize: '13px',
 				color: '#7569b1'
 			})
 			.setOrigin(0.5);
 		const question = this.add
-			.text(0, -44, item.question, {
+			.text(-10, 0, item.question, {
 				fontFamily: 'Microsoft YaHei',
 				fontSize: '17px',
 				fontStyle: 'bold',
@@ -830,7 +880,7 @@ export class EyeAssemblyScene extends Phaser.Scene {
 			.setOrigin(0.5);
 		panel.add([bg, eye, progress, question]);
 		item.options.forEach((option, i) => {
-			const answer = this.makeButton(0, 34 + i * 62, 272, 48, `${String.fromCharCode(65 + i)}. ${option}`, () =>
+			const answer = this.makeButton(-10, 72 + i * 62, 272, 48, `${String.fromCharCode(65 + i)}. ${option}`, () =>
 				this.answerQuiz(i)
 			);
 			panel.add(answer);
@@ -857,12 +907,19 @@ export class EyeAssemblyScene extends Phaser.Scene {
 		this.quizPanel?.destroy(true);
 		this.best = Math.max(this.best, this.score);
 		localStorage.setItem('eye-anatomy-best', String(this.best));
-		const panel = this.add.container(195, 444).setDepth(78);
-		const bg = this.add.rectangle(0, 0, 344, 502, 0xffffff, 0.99).setStrokeStyle(3, 0x6d5bd7);
-		const img = this.add.image(0, -186, this.score >= 90 ? 'laugh' : this.score >= 70 ? 'smile' : 'calm').setDisplaySize(67, 67);
+		const panel = this.add.container(205, 422).setDepth(78);
+		const bg = this.add.graphics();
+		bg.fillStyle(0xffffff, 0.99);
+		bg.lineStyle(3, 0x6d5bd7, 1);
+		bg.fillRoundedRect(-172, -179, 324, 444, 8);
+		bg.strokeRoundedRect(-172, -179, 324, 444, 8);
+
+		const img = this.add
+			.image(-10, -116, this.score >= 90 ? 'laugh' : this.score >= 70 ? 'smile' : 'calm')
+			.setDisplaySize(67, 67);
 
 		const title = this.add
-			.text(0, -93, '眼球结构小专家', {
+			.text(-10, -53, '眼球结构小专家', {
 				fontFamily: 'Microsoft YaHei',
 				fontSize: '25px',
 				fontStyle: 'bold',
@@ -870,7 +927,7 @@ export class EyeAssemblyScene extends Phaser.Scene {
 			})
 			.setOrigin(0.5);
 		const score = this.add
-			.text(0, -38, `${this.score} 分`, {
+			.text(-10, -8, `${this.score} 分`, {
 				fontFamily: 'Arial',
 				fontSize: '34px',
 				fontStyle: 'bold',
@@ -878,16 +935,21 @@ export class EyeAssemblyScene extends Phaser.Scene {
 			})
 			.setOrigin(0.5);
 		const stats = this.add
-			.text(0, 29, `成功拼装  ${this.placed} / ${PARTS.length}\n问答正确  ${this.quizCorrect} / ${this.quizList.length}\n最高纪录  ${this.best}`, {
-				fontFamily: 'Microsoft YaHei',
-				fontSize: '14px',
-				color: '#596174',
-				align: 'center',
-				lineSpacing: 8
-			})
+			.text(
+				-10,
+				61,
+				`成功拼装  ${this.placed} / ${PARTS.length}\n问答正确  ${this.quizCorrect} / ${this.quizList.length}\n最高纪录  ${this.best}`,
+				{
+					fontFamily: 'Microsoft YaHei',
+					fontSize: '14px',
+					color: '#596174',
+					align: 'center',
+					lineSpacing: 8
+				}
+			)
 			.setOrigin(0.5);
 		const fact = this.add
-			.text(0, 116, '眼睛负责接收光线，大脑负责读懂信号。\n保护眼睛，也要记得每天增加户外活动！', {
+			.text(-10, 136, '眼睛负责接收光线，大脑负责读懂信号。\n保护眼睛，也要记得每天增加户外活动！', {
 				fontFamily: 'Microsoft YaHei',
 				fontSize: '12px',
 				color: '#4f46a5',
@@ -895,7 +957,7 @@ export class EyeAssemblyScene extends Phaser.Scene {
 				lineSpacing: 5
 			})
 			.setOrigin(0.5);
-		const restart = this.makeButton(0, 190, 210, 52, '再看一次眼球组装', () => {
+		const restart = this.makeButton(-10, 190, 210, 52, '再看一次眼球组装', () => {
 			panel.destroy(true);
 			if (AUTO_START_FOR_DEBUG) {
 				this.startAssembly();
@@ -908,7 +970,7 @@ export class EyeAssemblyScene extends Phaser.Scene {
 			this.state = 'intro';
 		});
 		const note = this.add
-			.text(0, 234, '趣味结构示意 · 不替代医学检查或诊断', {
+			.text(-10, 243, '趣味结构示意 · 不替代医学检查或诊断', {
 				fontFamily: 'Microsoft YaHei',
 				fontSize: '12px',
 				color: '#a0a6b4'
@@ -919,7 +981,7 @@ export class EyeAssemblyScene extends Phaser.Scene {
 	}
 
 	private updateHud() {
-		this.hudProgress.setText(`${this.placed} / 5`);
+		this.hudProgress.setText(`${this.placed} / ${PARTS.length}`);
 		this.hudScore.setText(this.score.toString().padStart(3, '0'));
 	}
 
