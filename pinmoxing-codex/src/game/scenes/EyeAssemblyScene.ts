@@ -1,4 +1,4 @@
-import * as Phaser from 'phaser';
+﻿import * as Phaser from 'phaser';
 import { RENDER_SCALE, VIEW_HEIGHT, VIEW_WIDTH } from '../constants';
 
 type GameState = 'intro' | 'scatter' | 'assemble' | 'quiz' | 'result';
@@ -8,6 +8,7 @@ interface EyePart {
 	id: PartId;
 	name: string;
 	color: number;
+	textColor?: string;
 	asset: string;
 	iconSize: [number, number];
 	placedSize: [number, number];
@@ -43,6 +44,7 @@ const PARTS: EyePart[] = [
 		id: 'cornea',
 		name: '角膜',
 		color: 0x5ed9ef,
+		textColor: '#164E63',
 		asset: 'part-cornea',
 		iconSize: [46, 52],
 		placedSize: [112, 132],
@@ -57,6 +59,7 @@ const PARTS: EyePart[] = [
 		id: 'iris',
 		name: '虹膜',
 		color: 0x32b58c,
+		textColor: '#FFFFFF',
 		asset: 'part-iris',
 		iconSize: [52, 52],
 		placedSize: [56, 106],
@@ -70,6 +73,7 @@ const PARTS: EyePart[] = [
 		id: 'lens',
 		name: '晶状体',
 		color: 0xffc94d,
+		textColor: '#593800',
 		asset: 'part-lens',
 		iconSize: [56, 54],
 		placedSize: [74, 80],
@@ -83,6 +87,7 @@ const PARTS: EyePart[] = [
 		id: 'body',
 		name: '玻璃体',
 		color: 0x79d7ff,
+		textColor: '#164E63',
 		asset: 'part-body',
 		iconSize: [58, 58],
 		placedSize: [126, 168],
@@ -97,6 +102,7 @@ const PARTS: EyePart[] = [
 		id: 'retina',
 		name: '视网膜',
 		color: 0xff7185,
+		textColor: '#FFFFFF',
 		asset: 'part-retina',
 		iconSize: [54, 42],
 		placedSize: [248, 188],
@@ -112,6 +118,7 @@ const PARTS: EyePart[] = [
 		id: 'optic',
 		name: '视神经',
 		color: 0x9b78e7,
+		textColor: '#FFFFFF',
 		asset: 'part-optic',
 		iconSize: [58, 38],
 		placedSize: [82, 42],
@@ -259,8 +266,16 @@ export class EyeAssemblyScene extends Phaser.Scene {
 	private hudProgress!: Phaser.GameObjects.Text;
 	private hudScore!: Phaser.GameObjects.Text;
 	private infoCard!: Phaser.GameObjects.Container;
+	private infoCardBg!: Phaser.GameObjects.Graphics;
 	private infoImage!: Phaser.GameObjects.Image;
 	private infoTitle!: Phaser.GameObjects.Text;
+	private infoImageBg!: Phaser.GameObjects.Arc;
+	private readonly infoTitleStyle: Phaser.Types.GameObjects.Text.TextStyle = {
+		fontFamily: 'Microsoft YaHei',
+		fontSize: '14px',
+		fontStyle: 'bold',
+		color: '#ffe28d'
+	};
 	private infoBody!: Phaser.GameObjects.Text;
 	private introPanel!: Phaser.GameObjects.Container;
 	private quizPanel?: Phaser.GameObjects.Container;
@@ -290,6 +305,7 @@ export class EyeAssemblyScene extends Phaser.Scene {
 		this.load.image('part-body', 'assets/part-body-3d.png');
 		this.load.image('part-retina', 'assets/part-retina-3d.png');
 		this.load.image('part-optic', 'assets/part-optic-3d-v2.png');
+		this.load.image('loading', 'assets/loading.png');
 	}
 
 	create() {
@@ -502,17 +518,11 @@ export class EyeAssemblyScene extends Phaser.Scene {
 		this.infoCard = this.add.container(INFO_CARD_X, INFO_CARD_Y).setDepth(35).setAlpha(0);
 		const shadow = this.add.graphics();
 		shadow.fillStyle(0x26335a, 0.18).fillRoundedRect(-158, -48, 330, 110, 4);
-		const bg = this.add.graphics();
-		bg.fillStyle(0x5045ad, 0.98).fillRoundedRect(-169, -59, 338, 118, 4);
-		bg.strokeRoundedRect(-169, -59, 338, 118, 4);
-		const imageBg = this.add.circle(-120, 4, 39, 0xffffff, 0.95).setStrokeStyle(2, 0xbdb4f5);
+		this.infoCardBg = this.add.graphics();
+		this.setInfoCardColor(0x5045ad);
+		this.infoImageBg = this.add.circle(-120, 4, 39, 0xffffff, 0.95).setStrokeStyle(2, 0xbdb4f5);
 		this.infoImage = this.add.image(-120, 4, 'mascot').setDisplaySize(58, 58);
-		this.infoTitle = this.add.text(-70, -32, '', {
-			fontFamily: 'Microsoft YaHei',
-			fontSize: '14px',
-			fontStyle: 'bold',
-			color: '#ffe28d'
-		});
+		this.infoTitle = this.add.text(-70, -32, '', this.infoTitleStyle);
 		this.infoBody = this.add.text(-70, -6, '', {
 			fontFamily: 'Microsoft YaHei',
 			fontSize: '12px',
@@ -533,12 +543,44 @@ export class EyeAssemblyScene extends Phaser.Scene {
 			.setInteractive({ useHandCursor: true })
 			.setVisible(false);
 		this.closeButton.on('pointerdown', () => {
-			this.tweens.killTweensOf(this.infoCard);
-			this.infoCard.setAlpha(0).setY(INFO_CARD_ENTER_Y);
-			this.closeButton.setVisible(false);
+			this.hideInfoCard();
 		});
 
-		this.infoCard.add([shadow, bg, imageBg, this.infoImage, this.infoTitle, this.infoBody, this.closeButton]);
+		this.infoCard.add([
+			shadow,
+			this.infoCardBg,
+			this.infoImageBg,
+			this.infoImage,
+			this.infoTitle,
+			this.infoBody,
+			this.closeButton
+		]);
+	}
+
+	private setInfoCardColor(bgColor: number, isBorder = false) {
+		this.infoCardBg.clear();
+
+		this.infoCardBg.fillStyle(bgColor, 1).fillRoundedRect(-169, -59, 338, 118, 4);
+
+		if (isBorder) {
+			const borderColor = this.darkenColor(bgColor);
+
+			this.infoCardBg.lineStyle(2, borderColor, 1).strokeRoundedRect(-169, -59, 338, 118, 4);
+		}
+	}
+
+	private darkenColor(color: number, factor = 0.88): number {
+		const r = (color >> 16) & 0xff;
+		const g = (color >> 8) & 0xff;
+		const b = color & 0xff;
+
+		return (Math.round(r * factor) << 16) | (Math.round(g * factor) << 8) | Math.round(b * factor);
+	}
+
+	private hideInfoCard() {
+		this.tweens.killTweensOf(this.infoCard);
+		this.infoCard.setAlpha(0).setY(INFO_CARD_ENTER_Y);
+		this.closeButton.setVisible(false);
 	}
 
 	private createIntro() {
@@ -771,17 +813,19 @@ export class EyeAssemblyScene extends Phaser.Scene {
 	}
 
 	private showFact(part: EyePart) {
+		this.setInfoCardColor(part.color, true);
+		const borderColor = this.darkenColor(part.color);
+		this.infoImageBg.setStrokeStyle(2, borderColor);
 		this.infoImage.setTexture(part.asset).setDisplaySize(part.iconSize[0] * 1.15, part.iconSize[1] * 1.15);
-		this.infoTitle.setText(`科普卡解锁 · ${part.name}`);
-		this.infoBody.setText(part.fact);
+		this.infoTitle.setText(`科普卡解锁 · ${part.name}`).setColor(part.textColor || '#FFFFFF');
+		this.infoBody.setText(part.fact).setColor(part.textColor || '#FFFFFF');
 		this.tweens.killTweensOf(this.infoCard);
 		this.infoCard.setAlpha(0).setY(INFO_CARD_ENTER_Y);
-		// this.tweens.add({ targets: this.infoCard, alpha: 1, y: INFO_CARD_Y, duration: 180, yoyo: true, hold: 1450 });
 
 		this.closeButton.setVisible(true);
 		this.tweens.add({
 			targets: this.infoCard,
-			alpha: 1,
+			alpha: 0.88,
 			y: INFO_CARD_Y,
 			duration: 180,
 			ease: 'Sine.Out'
@@ -789,9 +833,12 @@ export class EyeAssemblyScene extends Phaser.Scene {
 	}
 
 	private showMessage(text: string, holdTime = 1720) {
+		this.setInfoCardColor(0x5045ad);
+		this.infoImageBg.setStrokeStyle(2, 0xbdb4f5);
 		this.infoImage.setTexture('mascot').setDisplaySize(58, 58);
 		this.infoTitle.setText('小瞳提示');
-		this.infoBody.setText(text);
+		this.infoTitle.setStyle(this.infoTitleStyle);
+		this.infoBody.setText(text).setColor('#FFFFFF');
 		this.tweens.killTweensOf(this.infoCard);
 		this.infoCard.setAlpha(0).setY(INFO_CARD_ENTER_Y);
 		this.closeButton.setVisible(false);
@@ -808,6 +855,9 @@ export class EyeAssemblyScene extends Phaser.Scene {
 
 	private showAssemblyComplete() {
 		if (this.state !== 'assemble') return;
+
+		this.hideInfoCard();
+
 		this.state = 'quiz';
 		this.eyeModel.setAlpha(1);
 		this.targetLayer.setAlpha(0);
@@ -828,6 +878,7 @@ export class EyeAssemblyScene extends Phaser.Scene {
 			.rectangle(VIEW_WIDTH / 2, VIEW_HEIGHT / 2, VIEW_WIDTH, VIEW_HEIGHT, 0x000000, 0.67)
 			.setDepth(74);
 		shade.setAlpha(0);
+		shade.setInteractive();
 		this.tweens.add({ targets: shade, alpha: 1, duration: 220, ease: 'Sine.Out' });
 		this.completeShade = shade;
 		const bg = this.add.graphics();
@@ -883,7 +934,22 @@ export class EyeAssemblyScene extends Phaser.Scene {
 			return;
 		}
 		if (this.quizIndex >= this.quizList.length) {
-			this.showResult();
+			const loadingImage = this.add
+				.image(VIEW_WIDTH / 2, VIEW_HEIGHT / 2, 'loading')
+				.setDisplaySize(64, 64)
+				.setDepth(75);
+
+			this.tweens.add({
+				targets: loadingImage,
+				angle: 360,
+				duration: 1000,
+				repeat: -1
+			});
+
+			this.time.delayedCall(1500, () => {
+				this.showResult();
+			});
+
 			return;
 		}
 		const item = this.quizList[this.quizIndex];
@@ -915,8 +981,13 @@ export class EyeAssemblyScene extends Phaser.Scene {
 			.setOrigin(0.5);
 		panel.add([bg, eye, progress, question]);
 		item.options.forEach((option, i) => {
-			const view = this.makeQuizOption(-10, 72 + i * 62, 272, 48, `${String.fromCharCode(65 + i)}. ${option}`, () =>
-				this.answerQuiz(i)
+			const view = this.makeQuizOption(
+				-10,
+				72 + i * 62,
+				272,
+				48,
+				`${String.fromCharCode(65 + i)}. ${option}`,
+				() => this.answerQuiz(i)
 			);
 			panel.add(view.root);
 			this.quizOptions.push(view);
@@ -984,7 +1055,7 @@ export class EyeAssemblyScene extends Phaser.Scene {
 		}
 		this.updateHud();
 		this.quizIndex += 1;
-		this.time.delayedCall(700, () => this.showQuizQuestion());
+		this.time.delayedCall(1500, () => this.showQuizQuestion());
 	}
 
 	private showResult() {
@@ -996,8 +1067,8 @@ export class EyeAssemblyScene extends Phaser.Scene {
 		const bg = this.add.graphics();
 		bg.fillStyle(0xffffff, 0.99);
 		bg.lineStyle(3, 0x6d5bd7, 1);
-		bg.fillRoundedRect(-172, -179, 324, 444, 8);
-		bg.strokeRoundedRect(-172, -179, 324, 444, 8);
+		bg.fillRoundedRect(-172, -200, 324, 444, 8);
+		bg.strokeRoundedRect(-172, -200, 324, 444, 8);
 
 		const img = this.add
 			.image(-10, -116, this.score >= 90 ? 'laugh' : this.score >= 70 ? 'smile' : 'calm')
