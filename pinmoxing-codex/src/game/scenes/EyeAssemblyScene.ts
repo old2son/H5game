@@ -241,8 +241,8 @@ const SCENE_DECOR_CIRCLES = [
 	[360, 492, 96]
 ] as const;
 
-const AUTO_START_FOR_DEBUG = true;
-const AUTO_COMPLETE_FOR_DEBUG = true;
+const AUTO_START_FOR_DEBUG = false;
+const AUTO_COMPLETE_FOR_DEBUG = false;
 const AUTO_STARTQUIZ_FOR_DEBUG = false;
 const AUTO_SHOWRESULT_FOR_DEBUG = false;
 
@@ -1071,11 +1071,11 @@ export class EyeAssemblyScene extends Phaser.Scene {
 		bg.strokeRoundedRect(-172, -200, 324, 444, 8);
 
 		const img = this.add
-			.image(-10, -116, this.score >= 90 ? 'laugh' : this.score >= 70 ? 'smile' : 'calm')
+			.image(-10, -137, this.score >= 90 ? 'laugh' : this.score >= 70 ? 'smile' : 'calm')
 			.setDisplaySize(67, 67);
 
 		const title = this.add
-			.text(-10, -53, '眼球结构小专家', {
+			.text(-10, -74, '眼球结构小专家', {
 				fontFamily: 'Microsoft YaHei',
 				fontSize: '25px',
 				fontStyle: 'bold',
@@ -1083,7 +1083,7 @@ export class EyeAssemblyScene extends Phaser.Scene {
 			})
 			.setOrigin(0.5);
 		const score = this.add
-			.text(-10, -8, `${this.score} 分`, {
+			.text(-10, -29, `${this.score} 分`, {
 				fontFamily: 'Arial',
 				fontSize: '34px',
 				fontStyle: 'bold',
@@ -1093,7 +1093,7 @@ export class EyeAssemblyScene extends Phaser.Scene {
 		const stats = this.add
 			.text(
 				-10,
-				61,
+				40,
 				`成功拼装  ${this.placed} / ${PARTS.length}\n问答正确  ${this.quizCorrect} / ${this.quizList.length}\n最高纪录  ${this.best}`,
 				{
 					fontFamily: 'Microsoft YaHei',
@@ -1105,7 +1105,7 @@ export class EyeAssemblyScene extends Phaser.Scene {
 			)
 			.setOrigin(0.5);
 		const fact = this.add
-			.text(-10, 136, '眼睛负责接收光线，大脑负责读懂信号。\n保护眼睛，也要记得每天增加户外活动！', {
+			.text(-10, 115, '眼睛负责接收光线，大脑负责读懂信号。\n保护眼睛，也要记得每天增加户外活动！', {
 				fontFamily: 'Microsoft YaHei',
 				fontSize: '12px',
 				color: '#4f46a5',
@@ -1113,7 +1113,7 @@ export class EyeAssemblyScene extends Phaser.Scene {
 				lineSpacing: 5
 			})
 			.setOrigin(0.5);
-		const restart = this.makeButton(-10, 190, 210, 52, '再看一次眼球组装', () => {
+		const restart = this.makeButton(-10, 169, 210, 52, '再看一次眼球组装', () => {
 			panel.destroy(true);
 			// 重新游玩才撤掉完成后的遮罩
 			this.clearCompleteShade();
@@ -1128,7 +1128,7 @@ export class EyeAssemblyScene extends Phaser.Scene {
 			this.state = 'intro';
 		});
 		const note = this.add
-			.text(-10, 243, '趣味结构示意 · 不替代医学检查或诊断', {
+			.text(-10, 222, '趣味结构示意 · 不替代医学检查或诊断', {
 				fontFamily: 'Microsoft YaHei',
 				fontSize: '12px',
 				color: '#a0a6b4'
